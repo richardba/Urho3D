@@ -19,6 +19,9 @@ function Start()
     -- Create the sprites to the user interface
     CreateSprites()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_FREE)
+
     -- Hook up to the frame update events
     SubscribeToEvents()
 end
@@ -91,7 +94,7 @@ function MoveSprites(timeStep)
 end
 
 function HandleUpdate(eventType, eventData)
-    local timeStep = eventData:GetFloat("TimeStep")
+    local timeStep = eventData["TimeStep"]:GetFloat()
 
     MoveSprites(timeStep)
 end

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@
 namespace Urho3D
 {
 
+class Drawable2D; 
 class Renderer2D;
 class Texture2D;
 class VertexBuffer;
@@ -43,7 +44,23 @@ struct Vertex2D
     Vector2 uv_;
 };
 
-static const unsigned MASK_VERTEX2D = MASK_POSITION | MASK_COLOR | MASK_TEXCOORD1;
+/// 2D source batch.
+struct SourceBatch2D
+{
+    /// Construct.
+    SourceBatch2D();
+
+    /// Owner.
+    WeakPtr<Drawable2D> owner_;
+    /// Distance to camera.
+    mutable float distance_;
+    /// Draw order.
+    int drawOrder_;
+    /// Material.
+    SharedPtr<Material> material_;
+    /// Vertices.
+    Vector<Vertex2D> vertices_;
+};
 
 /// Pixel size (equal 0.01f).
 extern URHO3D_API const float PIXEL_SIZE;
@@ -51,7 +68,7 @@ extern URHO3D_API const float PIXEL_SIZE;
 /// Base class for 2D visible components.
 class URHO3D_API Drawable2D : public Drawable
 {
-    OBJECT(Drawable2D);
+    URHO3D_OBJECT(Drawable2D, Drawable);
 
 public:
     /// Construct.
@@ -68,61 +85,37 @@ public:
     void SetLayer(int layer);
     /// Set order in layer.
     void SetOrderInLayer(int orderInLayer);
-    /// Set texture.
-    void SetTexture(Texture2D* texture);
-    /// Set blend mode.
-    void SetBlendMode(BlendMode mode);
-    /// Set custom material. 
-    void SetCustomMaterial(Material* customMaterial);
-    
+
     /// Return layer.
     int GetLayer() const { return layer_; }
+
     /// Return order in layer.
     int GetOrderInLayer() const { return orderInLayer_; }
-    /// Return texture.
-    Texture2D* GetTexture() const;
-    /// Return blend mode.
-    BlendMode GetBlendMode() const { return blendMode_; }
-    /// Return custom material.
-    Material* GetCustomMaterial() const;
 
-    /// Set material (called by Renderer2D).
-    void SetMaterial(Material* material);
-    /// Return custom material or material (called by Renderer2D).
-    Material* GetMaterial() const;
-    /// Return all vertices (called by Renderer2D).
-    const Vector<Vertex2D>& GetVertices();
+    /// Return all source batches (called by Renderer2D).
+    const Vector<SourceBatch2D>& GetSourceBatches();
 
 protected:
-    /// Handle node being assigned.
-    virtual void OnNodeSet(Node* node);
+    /// Handle scene being assigned.
+    virtual void OnSceneSet(Scene* scene);
     /// Handle node transform being dirtied.
     virtual void OnMarkedDirty(Node* node);
-    /// Handle layer changed.
-    virtual void OnLayerChanged();
-    /// Handle blend mode changed.
-    virtual void OnBlendModeChanged();
-    /// Update vertices.
-    virtual void UpdateVertices() = 0;
-    
+    /// Handle draw order changed.
+    virtual void OnDrawOrderChanged() = 0;
+    /// Update source batches.
+    virtual void UpdateSourceBatches() = 0;
+
+    /// Return draw order by layer and order in layer.
+    int GetDrawOrder() const { return (layer_ << 20) + (orderInLayer_ << 10); }
 
     /// Layer.
     int layer_;
     /// Order in layer.
     int orderInLayer_;
-    /// Texture.
-    SharedPtr<Texture2D> texture_;
-    /// Blend mode.
-    BlendMode blendMode_;
-    /// Custom material.
-    SharedPtr<Material> customMaterial_;
-
-    /// Vertices.
-    Vector<Vertex2D> vertices_;
-    /// Vertices dirty flag.
-    bool verticesDirty_;
-    /// Material.
-    SharedPtr<Material> material_;
+    /// Source batches.
+    Vector<SourceBatch2D> sourceBatches_;
+    /// Source batches dirty flag.
+    bool sourceBatchesDirty_;
     /// Renderer2D.
     WeakPtr<Renderer2D> renderer_;
 };

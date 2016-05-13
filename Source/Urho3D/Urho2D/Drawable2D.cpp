@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,13 +20,15 @@
 // THE SOFTWARE.
 //
 
-#include "../Graphics/Camera.h"
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
-#include "../Urho2D/Drawable2D.h"
+#include "../Graphics/Camera.h"
 #include "../Graphics/Material.h"
-#include "../Urho2D/Renderer2D.h"
-#include "../Scene/Scene.h"
 #include "../Graphics/Texture2D.h"
+#include "../Scene/Scene.h"
+#include "../Urho2D/Drawable2D.h"
+#include "../Urho2D/Renderer2D.h"
 
 #include "../DebugNew.h"
 
@@ -34,14 +36,18 @@ namespace Urho3D
 {
 
 const float PIXEL_SIZE = 0.01f;
-extern const char* blendModeNames[];
+
+SourceBatch2D::SourceBatch2D() :
+    distance_(0.0f),
+    drawOrder_(0)
+{
+}
 
 Drawable2D::Drawable2D(Context* context) :
     Drawable(context, DRAWABLE_GEOMETRY2D),
     layer_(0),
     orderInLayer_(0),
-    blendMode_(BLEND_ALPHA),
-    verticesDirty_(true)
+    sourceBatchesDirty_(true)
 {
 }
 
@@ -53,10 +59,9 @@ Drawable2D::~Drawable2D()
 
 void Drawable2D::RegisterObject(Context* context)
 {
-    ACCESSOR_ATTRIBUTE("Layer", GetLayer, SetLayer, int, 0, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Order in Layer", GetOrderInLayer, SetOrderInLayer, int, 0, AM_DEFAULT);
-    ENUM_ACCESSOR_ATTRIBUTE("Blend Mode", GetBlendMode, SetBlendMode, BlendMode, blendModeNames, BLEND_ALPHA, AM_DEFAULT);
-    COPY_BASE_ATTRIBUTES(Drawable);
+    URHO3D_ACCESSOR_ATTRIBUTE("Layer", GetLayer, SetLayer, int, 0, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Order in Layer", GetOrderInLayer, SetOrderInLayer, int, 0, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("View Mask", int, viewMask_, DEFAULT_VIEWMASK, AM_DEFAULT);
 }
 
 void Drawable2D::OnSetEnabled()
@@ -76,11 +81,7 @@ void Drawable2D::SetLayer(int layer)
 
     layer_ = layer;
 
-    OnLayerChanged();
-
-    if (renderer_)
-        renderer_->MarkOrderDirty();
-
+    OnDrawOrderChanged();
     MarkNetworkUpdate();
 }
 
@@ -90,102 +91,29 @@ void Drawable2D::SetOrderInLayer(int orderInLayer)
         return;
 
     orderInLayer_ = orderInLayer;
-    
-    OnLayerChanged();
 
-    if (renderer_)
-        renderer_->MarkOrderDirty();
-
+    OnDrawOrderChanged();
     MarkNetworkUpdate();
 }
 
-void Drawable2D::SetTexture(Texture2D* texture)
+const Vector<SourceBatch2D>& Drawable2D::GetSourceBatches()
 {
-    if (texture == texture_)
-        return;
+    if (sourceBatchesDirty_)
+        UpdateSourceBatches();
 
-    texture_ = texture;
-
-    verticesDirty_ = true;
-    material_ = 0;
-    if (renderer_)
-        renderer_->MarkMaterialDirty(this);
-
-    OnMarkedDirty(node_);
-
-    MarkNetworkUpdate();
+    return sourceBatches_;
 }
 
-void Drawable2D::SetBlendMode(BlendMode blendMode)
+void Drawable2D::OnSceneSet(Scene* scene)
 {
-    if (blendMode == blendMode_)
-        return;
-
-    blendMode_ = blendMode;
-    material_ = 0;
-    if (renderer_)
-        renderer_->MarkMaterialDirty(this);
-
-    OnBlendModeChanged();
-
-    MarkNetworkUpdate();
-}
-
-void Drawable2D::SetCustomMaterial(Material* customMaterial)
-{
-    if (customMaterial == customMaterial_)
-        return;
-
-    customMaterial_ = customMaterial;
-    material_ = 0;
-    if (renderer_)
-        renderer_->MarkMaterialDirty(this);
-
-    MarkNetworkUpdate();
-}
-
-Texture2D* Drawable2D::GetTexture() const
-{
-    return texture_;
-}
-
-Material* Drawable2D::GetCustomMaterial() const
-{
-    return customMaterial_;
-}
-
-void Drawable2D::SetMaterial(Material* material)
-{
-    material_ = material;
-}
-
-Material* Drawable2D::GetMaterial() const
-{
-    return customMaterial_ ? customMaterial_ : material_;
-}
-
-const Vector<Vertex2D>& Drawable2D::GetVertices()
-{
-    if (verticesDirty_)
-        UpdateVertices();
-    return vertices_;
-}
-
-void Drawable2D::OnNodeSet(Node* node)
-{
-    // Do not call Drawable::OnNodeSet(node)
-
-    if (node)
+    // Do not call Drawable::OnSceneSet(node), as 2D drawable components should not be added to the octree
+    // but are instead rendered through Renderer2D
+    if (scene)
     {
-        Scene* scene = GetScene();
-        if (scene)
-        {
-            renderer_ = scene->GetOrCreateComponent<Renderer2D>();
-            if (IsEnabledEffective())
-                renderer_->AddDrawable(this);
-        }
+        renderer_ = scene->GetOrCreateComponent<Renderer2D>();
 
-        node->AddListener(this);
+        if (IsEnabledEffective())
+            renderer_->AddDrawable(this);
     }
     else
     {
@@ -198,15 +126,7 @@ void Drawable2D::OnMarkedDirty(Node* node)
 {
     Drawable::OnMarkedDirty(node);
 
-    verticesDirty_ = true;
-}
-
-void Drawable2D::OnLayerChanged()
-{
-}
-
-void Drawable2D::OnBlendModeChanged()
-{
+    sourceBatchesDirty_ = true;
 }
 
 }

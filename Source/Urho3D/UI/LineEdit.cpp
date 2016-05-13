@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+#include "../Precompiled.h"
 
 #include "../Core/Context.h"
 #include "../Input/Input.h"
@@ -60,9 +62,9 @@ LineEdit::LineEdit(Context* context) :
     cursor_->SetInternal(true);
     cursor_->SetPriority(1); // Show over text
 
-    SubscribeToEvent(this, E_FOCUSED, HANDLER(LineEdit, HandleFocused));
-    SubscribeToEvent(this, E_DEFOCUSED, HANDLER(LineEdit, HandleDefocused));
-    SubscribeToEvent(this, E_LAYOUTUPDATED, HANDLER(LineEdit, HandleLayoutUpdated));
+    SubscribeToEvent(this, E_FOCUSED, URHO3D_HANDLER(LineEdit, HandleFocused));
+    SubscribeToEvent(this, E_DEFOCUSED, URHO3D_HANDLER(LineEdit, HandleDefocused));
+    SubscribeToEvent(this, E_LAYOUTUPDATED, URHO3D_HANDLER(LineEdit, HandleLayoutUpdated));
 }
 
 LineEdit::~LineEdit()
@@ -73,16 +75,16 @@ void LineEdit::RegisterObject(Context* context)
 {
     context->RegisterFactory<LineEdit>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(BorderImage);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Focus Mode", FM_FOCUSABLE_DEFOCUSABLE);
-    ACCESSOR_ATTRIBUTE("Max Length", GetMaxLength, SetMaxLength, unsigned, 0, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Is Cursor Movable", IsCursorMovable, SetCursorMovable, bool, true, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Is Text Selectable", IsTextSelectable, SetTextSelectable, bool, true, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Is Text Copyable", IsTextCopyable, SetTextCopyable, bool, true, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Cursor Blink Rate", GetCursorBlinkRate, SetCursorBlinkRate, float, 1.0f, AM_FILE);
-    ATTRIBUTE("Echo Character", int, echoCharacter_, 0, AM_FILE);
+    URHO3D_COPY_BASE_ATTRIBUTES(BorderImage);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Focus Mode", FM_FOCUSABLE_DEFOCUSABLE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Max Length", GetMaxLength, SetMaxLength, unsigned, 0, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Cursor Movable", IsCursorMovable, SetCursorMovable, bool, true, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Text Selectable", IsTextSelectable, SetTextSelectable, bool, true, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Text Copyable", IsTextCopyable, SetTextCopyable, bool, true, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Cursor Blink Rate", GetCursorBlinkRate, SetCursorBlinkRate, float, 1.0f, AM_FILE);
+    URHO3D_ATTRIBUTE("Echo Character", int, echoCharacter_, 0, AM_FILE);
 }
 
 void LineEdit::ApplyAttributes()
@@ -113,7 +115,8 @@ void LineEdit::Update(float timeStep)
     cursor_->SetVisible(cursorVisible);
 }
 
-void LineEdit::OnClickBegin(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers, Cursor* cursor)
+void LineEdit::OnClickBegin(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers,
+    Cursor* cursor)
 {
     if (button == MOUSEB_LEFT && cursorMovable_)
     {
@@ -126,20 +129,23 @@ void LineEdit::OnClickBegin(const IntVector2& position, const IntVector2& screen
     }
 }
 
-void LineEdit::OnDoubleClick(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers, Cursor* cursor)
+void LineEdit::OnDoubleClick(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers,
+    Cursor* cursor)
 {
     if (button == MOUSEB_LEFT)
         text_->SetSelection(0);
 }
 
-void LineEdit::OnDragBegin(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers, Cursor* cursor)
+void LineEdit::OnDragBegin(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers,
+    Cursor* cursor)
 {
     UIElement::OnDragBegin(position, screenPosition, buttons, qualifiers, cursor);
-    
+
     dragBeginCursor_ = GetCharIndex(position);
 }
 
-void LineEdit::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons, int qualifiers, Cursor* cursor)
+void LineEdit::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons,
+    int qualifiers, Cursor* cursor)
 {
     if (cursorMovable_ && textSelectable_)
     {
@@ -235,7 +241,7 @@ void LineEdit::OnKey(int key, int buttons, int qualifiers)
             if (!clipBoard.Empty())
             {
                 // Remove selected text first
-                if(text_->GetSelectionLength() > 0)
+                if (text_->GetSelectionLength() > 0)
                 {
                     unsigned start = text_->GetSelectionStart();
                     unsigned length = text_->GetSelectionLength();
@@ -410,7 +416,8 @@ void LineEdit::OnKey(int key, int buttons, int qualifiers)
             SendEvent(E_TEXTFINISHED, eventData);
             return;
         }
-        break;
+
+    default: break;
     }
 
     if (changed)
@@ -620,11 +627,10 @@ unsigned LineEdit::GetCharIndex(const IntVector2& position)
     if (textPosition.x_ < 0)
         return 0;
 
-    int numChars = text_->GetNumChars();
-    for (int i = numChars; i >= 0; --i)
+    for (int i = text_->GetNumChars(); i >= 0; --i)
     {
-        if (textPosition.x_ >= text_->GetCharPosition(i).x_)
-            return i;
+        if (textPosition.x_ >= text_->GetCharPosition((unsigned)i).x_)
+            return (unsigned)i;
     }
 
     return M_MAX_UNSIGNED;

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,16 +20,18 @@
 // THE SOFTWARE.
 //
 
+#include "../../Precompiled.h"
+
 #include "../../Core/Context.h"
-#include "../../IO/FileSystem.h"
+#include "../../Core/Profiler.h"
 #include "../../Graphics/Graphics.h"
 #include "../../Graphics/GraphicsEvents.h"
 #include "../../Graphics/GraphicsImpl.h"
-#include "../../IO/Log.h"
 #include "../../Graphics/Renderer.h"
-#include "../../Core/Profiler.h"
-#include "../../Resource/ResourceCache.h"
 #include "../../Graphics/Texture3D.h"
+#include "../../IO/FileSystem.h"
+#include "../../IO/Log.h"
+#include "../../Resource/ResourceCache.h"
 #include "../../Resource/XMLFile.h"
 
 #include "../../DebugNew.h"
@@ -59,18 +61,18 @@ bool Texture3D::BeginLoad(Deserializer& source)
     // In headless mode, do not actually load the texture, just return success
     if (!graphics_)
         return true;
-    
+
     // If device is lost, retry later
     if (graphics_->IsDeviceLost())
     {
-        LOGWARNING("Texture load while device is lost");
+        URHO3D_LOGWARNING("Texture load while device is lost");
         dataPending_ = true;
         return true;
     }
-    
+
     String texPath, texName, texExt;
     SplitPath(GetName(), texPath, texName, texExt);
-    
+
     cache->ResetDependencies(this);
 
     loadParameters_ = new XMLFile(context_);
@@ -79,7 +81,7 @@ bool Texture3D::BeginLoad(Deserializer& source)
         loadParameters_.Reset();
         return false;
     }
-    
+
     XMLElement textureElem = loadParameters_->GetRoot();
     XMLElement volumeElem = textureElem.GetChild("volume");
     XMLElement colorlutElem = textureElem.GetChild("colorlut");
@@ -87,7 +89,7 @@ bool Texture3D::BeginLoad(Deserializer& source)
     if (volumeElem)
     {
         String name = volumeElem.GetAttribute("name");
-        
+
         String volumeTexPath, volumeTexName, volumeTexExt;
         SplitPath(name, volumeTexPath, volumeTexName, volumeTexExt);
         // If path is empty, add the XML file path
@@ -104,7 +106,7 @@ bool Texture3D::BeginLoad(Deserializer& source)
     else if (colorlutElem)
     {
         String name = colorlutElem.GetAttribute("name");
-        
+
         String colorlutTexPath, colorlutTexName, colorlutTexExt;
         SplitPath(name, colorlutTexPath, colorlutTexName, colorlutTexExt);
         // If path is empty, add the XML file path
@@ -126,7 +128,7 @@ bool Texture3D::BeginLoad(Deserializer& source)
         return true;
     }
 
-    LOGERROR("Texture3D XML data for " + GetName() + " did not contain either volume or colorlut element");
+    URHO3D_LOGERROR("Texture3D XML data for " + GetName() + " did not contain either volume or colorlut element");
     return false;
 }
 
@@ -135,16 +137,16 @@ bool Texture3D::EndLoad()
     // In headless mode, do not actually load the texture, just return success
     if (!graphics_ || graphics_->IsDeviceLost())
         return true;
-    
+
     // If over the texture budget, see if materials can be freed to allow textures to be freed
     CheckTextureBudget(GetTypeStatic());
 
     SetParameters(loadParameters_);
     bool success = SetData(loadImage_);
-    
+
     loadImage_.Reset();
     loadParameters_.Reset();
-    
+
     return success;
 }
 
@@ -169,150 +171,133 @@ void Texture3D::OnDeviceReset()
             dataLost_ = true;
         }
     }
-    
+
     dataPending_ = false;
 }
 
 void Texture3D::Release()
 {
-    if (object_)
+    if (graphics_)
     {
-        if (!graphics_)
-            return;
-        
         for (unsigned i = 0; i < MAX_TEXTURE_UNITS; ++i)
         {
             if (graphics_->GetTexture(i) == this)
                 graphics_->SetTexture(i, 0);
         }
-        
-        if (renderSurface_)
-            renderSurface_->Release();
-        
-        ((IDirect3DVolumeTexture9*)object_)->Release();
-        object_ = 0;
     }
-    else
-    {
-        if (renderSurface_)
-            renderSurface_->Release();
-    }
+
+    URHO3D_SAFE_RELEASE(object_);
 }
 
 bool Texture3D::SetSize(int width, int height, int depth, unsigned format, TextureUsage usage)
 {
-    // Delete the old rendersurface if any
-    renderSurface_.Reset();
+    if (width <= 0 || height <= 0 || depth <= 0)
+    {
+        URHO3D_LOGERROR("Zero or negative 3D texture dimensions");
+        return false;
+    }
+    if (usage >= TEXTURE_RENDERTARGET)
+    {
+        URHO3D_LOGERROR("Rendertarget or depth-stencil usage not supported for 3D textures");
+        return false;
+    }
+
     pool_ = D3DPOOL_MANAGED;
     usage_ = 0;
-    
-    if (usage == TEXTURE_RENDERTARGET)
-    {
-        renderSurface_ = new RenderSurface(this);
-        usage_ |= D3DUSAGE_RENDERTARGET;
-        pool_ = D3DPOOL_DEFAULT;
-        
-        // Clamp mode addressing by default, nearest filtering, and mipmaps disabled
-        addressMode_[COORD_U] = ADDRESS_CLAMP;
-        addressMode_[COORD_V] = ADDRESS_CLAMP;
-        filterMode_ = FILTER_NEAREST;
-        requestedLevels_ = 1;
-    }
-    else if (usage == TEXTURE_DYNAMIC)
+
+    if (usage == TEXTURE_DYNAMIC)
     {
         usage_ |= D3DUSAGE_DYNAMIC;
         pool_ = D3DPOOL_DEFAULT;
     }
-    
-    if (usage == TEXTURE_RENDERTARGET)
-        SubscribeToEvent(E_RENDERSURFACEUPDATE, HANDLER(Texture3D, HandleRenderSurfaceUpdate));
-    else
-        UnsubscribeFromEvent(E_RENDERSURFACEUPDATE);
 
     width_ = width;
     height_ = height;
     depth_ = depth;
     format_ = format;
-    
+
     return Create();
 }
 
 bool Texture3D::SetData(unsigned level, int x, int y, int z, int width, int height, int depth, const void* data)
 {
-    PROFILE(SetTextureData);
-    
+    URHO3D_PROFILE(SetTextureData);
+
     if (!object_)
     {
-        LOGERROR("No texture created, can not set data");
+        URHO3D_LOGERROR("No texture created, can not set data");
         return false;
     }
-    
+
     if (!data)
     {
-        LOGERROR("Null source for setting data");
+        URHO3D_LOGERROR("Null source for setting data");
         return false;
     }
-    
+
     if (level >= levels_)
     {
-        LOGERROR("Illegal mip level for setting data");
+        URHO3D_LOGERROR("Illegal mip level for setting data");
         return false;
     }
-    
+
     if (graphics_->IsDeviceLost())
     {
-        LOGWARNING("Texture data assignment while device is lost");
+        URHO3D_LOGWARNING("Texture data assignment while device is lost");
         dataPending_ = true;
         return true;
     }
-    
+
     if (IsCompressed())
     {
         x &= ~3;
         y &= ~3;
     }
-    
+
     int levelWidth = GetLevelWidth(level);
     int levelHeight = GetLevelHeight(level);
     int levelDepth = GetLevelDepth(level);
-    if (x < 0 || x + width > levelWidth || y < 0 || y + height > levelHeight || z < 0 || z + depth > levelDepth || width <= 0 || height <= 0 || depth <= 0)
+    if (x < 0 || x + width > levelWidth || y < 0 || y + height > levelHeight || z < 0 || z + depth > levelDepth || width <= 0 ||
+        height <= 0 || depth <= 0)
     {
-        LOGERROR("Illegal dimensions for setting data");
+        URHO3D_LOGERROR("Illegal dimensions for setting data");
         return false;
     }
-    
+
     D3DLOCKED_BOX d3dLockedBox;
     D3DBOX d3dBox;
-    d3dBox.Left = x;
-    d3dBox.Top = y;
-    d3dBox.Front = z;
-    d3dBox.Right = x + width;
-    d3dBox.Bottom = y + height;
-    d3dBox.Back = z + depth;
-    
+    d3dBox.Left = (UINT)x;
+    d3dBox.Top = (UINT)y;
+    d3dBox.Front = (UINT)z;
+    d3dBox.Right = (UINT)(x + width);
+    d3dBox.Bottom = (UINT)(y + height);
+    d3dBox.Back = (UINT)(z + depth);
+
     DWORD flags = 0;
-    if (level == 0 && x == 0 && y == 0 && z == 0 && width == levelWidth && height == levelHeight && depth == levelDepth && pool_ == D3DPOOL_DEFAULT)
+    if (level == 0 && x == 0 && y == 0 && z == 0 && width == levelWidth && height == levelHeight && depth == levelDepth &&
+        pool_ == D3DPOOL_DEFAULT)
         flags |= D3DLOCK_DISCARD;
-    
-    if (FAILED(((IDirect3DVolumeTexture9*)object_)->LockBox(level, &d3dLockedBox, (flags & D3DLOCK_DISCARD) ? 0 : &d3dBox, flags)))
+
+    HRESULT hr = ((IDirect3DVolumeTexture9*)object_)->LockBox(level, &d3dLockedBox, (flags & D3DLOCK_DISCARD) ? 0 : &d3dBox, flags);
+    if (FAILED(hr))
     {
-        LOGERROR("Could not lock texture");
+        URHO3D_LOGD3DERROR("Could not lock texture", hr);
         return false;
     }
-    
+
     if (IsCompressed())
     {
         height = (height + 3) >> 2;
         y >>= 2;
     }
-    
+
     unsigned char* src = (unsigned char*)data;
     unsigned rowSize = GetRowDataSize(width);
-    
+
     // GetRowDataSize() returns CPU-side (source) data size, so need to convert for X8R8G8B8
     if (format_ == D3DFMT_X8R8G8B8)
         rowSize = rowSize / 3 * 4;
-    
+
     // Perform conversion from RGB / RGBA as necessary
     switch (format_)
     {
@@ -321,63 +306,73 @@ bool Texture3D::SetData(unsigned level, int x, int y, int z, int width, int heig
         {
             for (int i = 0; i < height; ++i)
             {
-                unsigned char* dest = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
+                unsigned char
+                    * dest = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
                 memcpy(dest, src, rowSize);
                 src += rowSize;
             }
         }
         break;
-        
+
     case D3DFMT_X8R8G8B8:
         for (int k = 0; k < levelDepth; ++k)
         {
             for (int i = 0; i < height; ++i)
             {
-                unsigned char* dest = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
+                unsigned char
+                    * dest = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
                 for (int j = 0; j < width; ++j)
                 {
-                    *dest++  = src[2]; *dest++ = src[1]; *dest++ = src[0]; *dest++ = 255;
+                    *dest++ = src[2];
+                    *dest++ = src[1];
+                    *dest++ = src[0];
+                    *dest++ = 255;
                     src += 3;
                 }
             }
         }
         break;
-        
+
     case D3DFMT_A8R8G8B8:
         for (int k = 0; k < levelDepth; ++k)
         {
             for (int i = 0; i < height; ++i)
             {
-                unsigned char* dest = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
+                unsigned char
+                    * dest = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
                 for (int j = 0; j < width; ++j)
                 {
-                    *dest++  = src[2]; *dest++ = src[1]; *dest++ = src[0]; *dest++ = src[3];
+                    *dest++ = src[2];
+                    *dest++ = src[1];
+                    *dest++ = src[0];
+                    *dest++ = src[3];
                     src += 4;
                 }
             }
         }
         break;
     }
-    
+
     ((IDirect3DVolumeTexture9*)object_)->UnlockBox(level);
     return true;
 }
 
-bool Texture3D::SetData(SharedPtr<Image> image, bool useAlpha)
+bool Texture3D::SetData(Image* image, bool useAlpha)
 {
     if (!image)
     {
-        LOGERROR("Null image, can not load texture");
+        URHO3D_LOGERROR("Null image, can not load texture");
         return false;
     }
-    
+
+    // Use a shared ptr for managing the temporary mip images created during this function
+    SharedPtr<Image> mipImage;
     unsigned memoryUse = sizeof(Texture3D);
-    
     int quality = QUALITY_HIGH;
     Renderer* renderer = GetSubsystem<Renderer>();
     if (renderer)
         quality = renderer->GetTextureQuality();
-    
+
     if (!image->IsCompressed())
     {
         unsigned char* levelData = image->GetData();
@@ -386,49 +381,53 @@ bool Texture3D::SetData(SharedPtr<Image> image, bool useAlpha)
         int levelDepth = image->GetDepth();
         unsigned components = image->GetComponents();
         unsigned format = 0;
-        
+
         // Discard unnecessary mip levels
         for (unsigned i = 0; i < mipsToSkip_[quality]; ++i)
         {
-            image = image->GetNextLevel();
+            mipImage = image->GetNextLevel(); image = mipImage;
             levelData = image->GetData();
             levelWidth = image->GetWidth();
             levelHeight = image->GetHeight();
             levelDepth = image->GetDepth();
         }
-        
+
         switch (components)
         {
         case 1:
             format = useAlpha ? Graphics::GetAlphaFormat() : Graphics::GetLuminanceFormat();
             break;
-            
+
         case 2:
             format = Graphics::GetLuminanceAlphaFormat();
             break;
-            
+
         case 3:
             format = Graphics::GetRGBFormat();
             break;
-            
+
         case 4:
             format = Graphics::GetRGBAFormat();
             break;
+
+        default:
+            assert(false);  // Should never reach here
+            break;
         }
-        
+
         // If image was previously compressed, reset number of requested levels to avoid error if level count is too high for new size
         if (IsCompressed() && requestedLevels_ > 1)
             requestedLevels_ = 0;
         SetSize(levelWidth, levelHeight, levelDepth, format);
-        
+
         for (unsigned i = 0; i < levels_; ++i)
         {
             SetData(i, 0, 0, 0, levelWidth, levelHeight, levelDepth, levelData);
             memoryUse += levelWidth * levelHeight * levelDepth * components;
-            
+
             if (i < levels_ - 1)
             {
-                image = image->GetNextLevel();
+                mipImage = image->GetNextLevel(); image = mipImage;
                 levelData = image->GetData();
                 levelWidth = image->GetWidth();
                 levelHeight = image->GetHeight();
@@ -444,13 +443,13 @@ bool Texture3D::SetData(SharedPtr<Image> image, bool useAlpha)
         unsigned levels = image->GetNumCompressedLevels();
         unsigned format = graphics_->GetFormat(image->GetCompressedFormat());
         bool needDecompress = false;
-        
+
         if (!format)
         {
             format = Graphics::GetRGBAFormat();
             needDecompress = true;
         }
-        
+
         unsigned mipsToSkip = mipsToSkip_[quality];
         if (mipsToSkip >= levels)
             mipsToSkip = levels - 1;
@@ -459,10 +458,10 @@ bool Texture3D::SetData(SharedPtr<Image> image, bool useAlpha)
         width /= (1 << mipsToSkip);
         height /= (1 << mipsToSkip);
         depth /= (1 << mipsToSkip);
-        
-        SetNumLevels(Max((int)(levels - mipsToSkip), 1));
+
+        SetNumLevels(Max((levels - mipsToSkip), 1U));
         SetSize(width, height, depth, format);
-        
+
         for (unsigned i = 0; i < levels_ && i < levels - mipsToSkip; ++i)
         {
             CompressedLevel level = image->GetCompressedLevel(i + mipsToSkip);
@@ -481,7 +480,7 @@ bool Texture3D::SetData(SharedPtr<Image> image, bool useAlpha)
             }
         }
     }
-    
+
     SetMemoryUse(memoryUse);
     return true;
 }
@@ -490,57 +489,58 @@ bool Texture3D::GetData(unsigned level, void* dest) const
 {
     if (!object_)
     {
-        LOGERROR("No texture created, can not get data");
+        URHO3D_LOGERROR("No texture created, can not get data");
         return false;
     }
-    
+
     if (!dest)
     {
-        LOGERROR("Null destination for getting data");
+        URHO3D_LOGERROR("Null destination for getting data");
         return false;
     }
-    
+
     if (level >= levels_)
     {
-        LOGERROR("Illegal mip level for getting data");
+        URHO3D_LOGERROR("Illegal mip level for getting data");
         return false;
     }
-    
+
     if (graphics_->IsDeviceLost())
     {
-        LOGWARNING("Getting texture data while device is lost");
+        URHO3D_LOGWARNING("Getting texture data while device is lost");
         return false;
     }
-    
+
     int levelWidth = GetLevelWidth(level);
     int levelHeight = GetLevelHeight(level);
     int levelDepth = GetLevelDepth(level);
-    
+
     D3DLOCKED_BOX d3dLockedBox;
     D3DBOX d3dBox;
     d3dBox.Left = 0;
     d3dBox.Top = 0;
     d3dBox.Front = 0;
-    d3dBox.Right = levelWidth;
-    d3dBox.Bottom = levelHeight;
-    d3dBox.Back = levelDepth;
-    
-    if (FAILED(((IDirect3DVolumeTexture9*)object_)->LockBox(level, &d3dLockedBox, &d3dBox, D3DLOCK_READONLY)))
+    d3dBox.Right = (UINT)levelWidth;
+    d3dBox.Bottom = (UINT)levelHeight;
+    d3dBox.Back = (UINT)levelDepth;
+
+    HRESULT hr = ((IDirect3DVolumeTexture9*)object_)->LockBox(level, &d3dLockedBox, &d3dBox, D3DLOCK_READONLY);
+    if (FAILED(hr))
     {
-        LOGERROR("Could not lock texture");
+        URHO3D_LOGD3DERROR("Could not lock texture", hr);
         return false;
     }
-    
+
     int height = levelHeight;
     if (IsCompressed())
         height = (height + 3) >> 2;
-    
+
     unsigned char* destPtr = (unsigned char*)dest;
     unsigned rowSize = GetRowDataSize(levelWidth);
     // GetRowDataSize() returns CPU-side (destination) data size, so need to convert for X8R8G8B8
     if (format_ == D3DFMT_X8R8G8B8)
         rowSize = rowSize / 3 * 4;
-    
+
     // Perform conversion to RGB / RGBA as necessary
     switch (format_)
     {
@@ -555,7 +555,7 @@ bool Texture3D::GetData(unsigned level, void* dest) const
             }
         }
         break;
-    
+
     case D3DFMT_X8R8G8B8:
         for (int k = 0; k < levelDepth; ++k)
         {
@@ -564,13 +564,16 @@ bool Texture3D::GetData(unsigned level, void* dest) const
                 unsigned char* src = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
                 for (int j = 0; j < levelWidth; ++j)
                 {
-                    destPtr[2] = *src++; destPtr[1] = *src++; destPtr[0] = *src++; ++src;
+                    destPtr[2] = *src++;
+                    destPtr[1] = *src++;
+                    destPtr[0] = *src++;
+                    ++src;
                     destPtr += 3;
-               }
+                }
             }
         }
         break;
-        
+
     case D3DFMT_A8R8G8B8:
         for (int k = 0; k < levelDepth; ++k)
         {
@@ -579,14 +582,17 @@ bool Texture3D::GetData(unsigned level, void* dest) const
                 unsigned char* src = (unsigned char*)d3dLockedBox.pBits + (k * d3dLockedBox.SlicePitch) + i * d3dLockedBox.RowPitch;
                 for (int j = 0; j < levelWidth; ++j)
                 {
-                    destPtr[2] = *src++; destPtr[1] = *src++; destPtr[0] = *src++; destPtr[3] = *src++;
+                    destPtr[2] = *src++;
+                    destPtr[1] = *src++;
+                    destPtr[0] = *src++;
+                    destPtr[3] = *src++;
                     destPtr += 4;
-               }
+                }
             }
         }
         break;
     }
-    
+
     ((IDirect3DVolumeTexture9*)object_)->UnlockBox(level);
     return true;
 }
@@ -594,42 +600,37 @@ bool Texture3D::GetData(unsigned level, void* dest) const
 bool Texture3D::Create()
 {
     Release();
-    
+
     if (!graphics_ || !width_ || !height_)
         return false;
-    
+
     if (graphics_->IsDeviceLost())
     {
-        LOGWARNING("Texture creation while device is lost");
+        URHO3D_LOGWARNING("Texture creation while device is lost");
         return true;
     }
-    
-    IDirect3DDevice9* device = graphics_->GetImpl()->GetDevice();
 
-    if (!device || FAILED(graphics_->GetImpl()->GetDevice()->CreateVolumeTexture(
-        width_,
-        height_,
-        depth_,
+    IDirect3DDevice9* device = graphics_->GetImpl()->GetDevice();
+    HRESULT hr = device->CreateVolumeTexture(
+        (UINT)width_,
+        (UINT)height_,
+        (UINT)depth_,
         requestedLevels_,
         usage_,
         (D3DFORMAT)format_,
         (D3DPOOL)pool_,
         (IDirect3DVolumeTexture9**)&object_,
-        0)))
+        0);
+    if (FAILED(hr))
     {
-        LOGERROR("Could not create texture");
+        URHO3D_SAFE_RELEASE(object_);
+        URHO3D_LOGD3DERROR("Could not create texture", hr);
         return false;
     }
-    
-    levels_ = ((IDirect3DVolumeTexture9*)object_)->GetLevelCount();
-    
-    return true;
-}
 
-void Texture3D::HandleRenderSurfaceUpdate(StringHash eventType, VariantMap& eventData)
-{
-    if (renderSurface_ && renderSurface_->GetUpdateMode() == SURFACE_UPDATEALWAYS)
-        renderSurface_->QueueUpdate();
+    levels_ = ((IDirect3DVolumeTexture9*)object_)->GetLevelCount();
+
+    return true;
 }
 
 }

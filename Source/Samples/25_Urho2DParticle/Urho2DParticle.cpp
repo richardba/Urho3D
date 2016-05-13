@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,29 +20,26 @@
 // THE SOFTWARE.
 //
 
-#include <Urho3D/Urho3D.h>
-
-#include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Core/CoreEvents.h>
 #include <Urho3D/Engine/Engine.h>
-#include <Urho3D/UI/Font.h>
+#include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Graphics/Graphics.h>
-#include <Urho3D/Input/Input.h>
-#include <Urho3D/Input/InputEvents.h>
 #include <Urho3D/Graphics/Octree.h>
-#include <Urho3D/Urho2D/ParticleEmitter2D.h>
-#include <Urho3D/Urho2D/ParticleEffect2D.h>
 #include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Graphics/Zone.h>
+#include <Urho3D/Input/Input.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
+#include <Urho3D/UI/Font.h>
 #include <Urho3D/UI/Text.h>
-#include <Urho3D/Graphics/Zone.h>
+#include <Urho3D/Urho2D/ParticleEffect2D.h>
+#include <Urho3D/Urho2D/ParticleEmitter2D.h>
 
 #include "Urho2DParticle.h"
 
 #include <Urho3D/DebugNew.h>
 
-DEFINE_APPLICATION_MAIN(Urho2DParticle)
+URHO3D_DEFINE_APPLICATION_MAIN(Urho2DParticle)
 
 Urho2DParticle::Urho2DParticle(Context* context) :
     Sample(context)
@@ -54,7 +51,7 @@ void Urho2DParticle::Start()
     // Execute base class startup
     Sample::Start();
 
-    // Set mouse visibile
+    // Set mouse visible
     Input* input = GetSubsystem<Input>();
     input->SetMouseVisible(true);
 
@@ -69,6 +66,9 @@ void Urho2DParticle::Start()
 
     // Hook up to the frame update events
     SubscribeToEvents();
+    
+    // Set the mouse mode to use in the sample
+    Sample::InitMouseMode(MM_FREE);
 }
 
 void Urho2DParticle::CreateScene()
@@ -133,9 +133,9 @@ void Urho2DParticle::SetupViewport()
 
 void Urho2DParticle::SubscribeToEvents()
 {
-    SubscribeToEvent(E_MOUSEMOVE, HANDLER(Urho2DParticle, HandleMouseMove));
+    SubscribeToEvent(E_MOUSEMOVE, URHO3D_HANDLER(Urho2DParticle, HandleMouseMove));
     if (touchEnabled_)
-        SubscribeToEvent(E_TOUCHMOVE, HANDLER(Urho2DParticle, HandleMouseMove));
+        SubscribeToEvent(E_TOUCHMOVE, URHO3D_HANDLER(Urho2DParticle, HandleMouseMove));
 
     // Unsubscribe the SceneUpdate event from base class to prevent camera pitch and yaw in 2D sample
     UnsubscribeFromEvent(E_SCENEUPDATE);

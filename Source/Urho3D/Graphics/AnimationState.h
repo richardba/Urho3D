@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,15 @@ class Skeleton;
 struct AnimationTrack;
 struct Bone;
 
+/// %Animation blending mode.
+enum AnimationBlendMode
+{
+    // Lerp blending (default)
+    ABM_LERP = 0,
+    // Additive blending based on difference from bind pose
+    ABM_ADDITIVE
+};
+
 /// %Animation instance per-track data.
 struct AnimationStateTrack
 {
@@ -43,7 +52,7 @@ struct AnimationStateTrack
     AnimationStateTrack();
     /// Destruct
     ~AnimationStateTrack();
-    
+
     /// Animation track.
     const AnimationTrack* track_;
     /// Bone pointer.
@@ -66,13 +75,15 @@ public:
     AnimationState(Node* node, Animation* animation);
     /// Destruct.
     ~AnimationState();
-    
+
     /// Set start bone. Not supported in node animation mode. Resets any assigned per-bone weights.
     void SetStartBone(Bone* bone);
     /// Set looping enabled/disabled.
     void SetLooped(bool looped);
     /// Set blending weight.
     void SetWeight(float weight);
+    /// Set blending mode.
+    void SetBlendMode(AnimationBlendMode mode);
     /// Set time position. Does not fire animation triggers.
     void SetTime(float time);
     /// Set per-bone blending weight by track index. Default is 1.0 (full), is multiplied  with the state's blending weight when applying the animation. Optionally recurses to child bones.
@@ -87,9 +98,10 @@ public:
     void AddTime(float delta);
     /// Set blending layer.
     void SetLayer(unsigned char layer);
-    
+
     /// Return animation.
     Animation* GetAnimation() const { return animation_; }
+
     /// Return animated model this state belongs to (model mode.)
     AnimatedModel* GetModel() const;
     /// Return root scene node this state controls (node hierarchy mode.)
@@ -108,33 +120,38 @@ public:
     unsigned GetTrackIndex(const String& name) const;
     /// Return track index by bone name hash, or M_MAX_UNSIGNED if not found.
     unsigned GetTrackIndex(StringHash nameHash) const;
+
     /// Return whether weight is nonzero.
     bool IsEnabled() const { return weight_ > 0.0f; }
+
     /// Return whether looped.
     bool IsLooped() const { return looped_; }
+
     /// Return blending weight.
     float GetWeight() const { return weight_; }
+
+    /// Return blending mode.
+    AnimationBlendMode GetBlendMode() const { return blendingMode_; }
+
     /// Return time position.
     float GetTime() const { return time_; }
+
     /// Return animation length.
     float GetLength() const;
+
     /// Return blending layer.
     unsigned char GetLayer() const { return layer_; }
-    
+
     /// Apply the animation at the current time position.
     void Apply();
-    
+
 private:
     /// Apply animation to a skeleton. Transform changes are applied silently, so the model needs to dirty its root model afterward.
     void ApplyToModel();
     /// Apply animation to a scene node hierarchy.
     void ApplyToNodes();
-    /// Apply animation track to a scene node, full weight.
-    void ApplyTrackFullWeight(AnimationStateTrack& stateTrack);
-    /// Apply animation track to a scene node, full weight. Apply transform changes silently without marking the node dirty.
-    void ApplyTrackFullWeightSilent(AnimationStateTrack& stateTrack);
-    /// Apply animation track to a scene node, blended with current node transform. Apply transform changes silently without marking the node dirty.
-    void ApplyTrackBlendedSilent(AnimationStateTrack& stateTrack, float weight);
+    /// Apply track.
+    void ApplyTrack(AnimationStateTrack& stateTrack, float weight, bool silent);
 
     /// Animated model (model mode.)
     WeakPtr<AnimatedModel> model_;
@@ -154,6 +171,8 @@ private:
     float time_;
     /// Blending layer.
     unsigned char layer_;
+    /// Blending mode.
+    AnimationBlendMode blendingMode_;
 };
 
 }

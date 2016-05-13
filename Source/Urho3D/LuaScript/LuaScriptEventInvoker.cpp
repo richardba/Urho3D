@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +20,8 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../LuaScript/LuaFunction.h"
 #include "../LuaScript/LuaScriptEventInvoker.h"
 #include "../LuaScript/LuaScriptInstance.h"
@@ -29,13 +31,13 @@
 namespace Urho3D
 {
 
-LuaScriptEventInvoker::LuaScriptEventInvoker(Context* context) : 
+LuaScriptEventInvoker::LuaScriptEventInvoker(Context* context) :
     Object(context)
 {
 }
 
-LuaScriptEventInvoker::LuaScriptEventInvoker(LuaScriptInstance* instance) : 
-    Object(instance->GetContext()), 
+LuaScriptEventInvoker::LuaScriptEventInvoker(LuaScriptInstance* instance) :
+    Object(instance->GetContext()),
     instance_(instance)
 {
 }
@@ -50,9 +52,9 @@ void LuaScriptEventInvoker::AddEventHandler(Object* sender, const StringHash& ev
         return;
 
     if (sender)
-        SubscribeToEvent(sender, eventType, HANDLER_USERDATA(LuaScriptEventInvoker, HandleLuaScriptEvent, function));
+        SubscribeToEvent(sender, eventType, URHO3D_HANDLER_USERDATA(LuaScriptEventInvoker, HandleLuaScriptEvent, function));
     else
-        SubscribeToEvent(eventType, HANDLER_USERDATA(LuaScriptEventInvoker, HandleLuaScriptEvent, function));
+        SubscribeToEvent(eventType, URHO3D_HANDLER_USERDATA(LuaScriptEventInvoker, HandleLuaScriptEvent, function));
 }
 
 void LuaScriptEventInvoker::HandleLuaScriptEvent(StringHash eventType, VariantMap& eventData)
@@ -63,23 +65,11 @@ void LuaScriptEventInvoker::HandleLuaScriptEvent(StringHash eventType, VariantMa
 
     // Keep instance alive during invoking
     SharedPtr<LuaScriptInstance> instance(instance_);
-    if (instance)
+    if (function->BeginCall(instance))      // instance may be null when invoking a procedural event handler
     {
-        if (function->BeginCall(instance))
-        {
-            function->PushUserType(eventType, "StringHash");
-            function->PushUserType(eventData, "VariantMap");
-            function->EndCall();
-        }
-    }
-    else
-    {
-        if (function->BeginCall())
-        {
-            function->PushUserType(eventType, "StringHash");
-            function->PushUserType(eventData, "VariantMap");
-            function->EndCall();
-        }
+        function->PushUserType(eventType, "StringHash");
+        function->PushUserType(eventData, "VariantMap");
+        function->EndCall();
     }
 }
 

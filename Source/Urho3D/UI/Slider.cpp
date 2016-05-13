@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+#include "../Precompiled.h"
 
 #include "../Core/Context.h"
 #include "../Input/InputEvents.h"
@@ -63,12 +65,12 @@ void Slider::RegisterObject(Context* context)
 {
     context->RegisterFactory<Slider>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(BorderImage);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
-    ENUM_ACCESSOR_ATTRIBUTE("Orientation", GetOrientation, SetOrientation, Orientation, orientations, O_HORIZONTAL, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Range", GetRange, SetRange, float, 1.0f, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Value", GetValue, SetValue, float, 0.0f, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Repeat Rate", GetRepeatRate, SetRepeatRate, float, 0.0f, AM_FILE);
+    URHO3D_COPY_BASE_ATTRIBUTES(BorderImage);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
+    URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Orientation", GetOrientation, SetOrientation, Orientation, orientations, O_HORIZONTAL, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Range", GetRange, SetRange, float, 1.0f, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Value", GetValue, SetValue, float, 0.0f, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Repeat Rate", GetRepeatRate, SetRepeatRate, float, 0.0f, AM_FILE);
 }
 
 void Slider::Update(float timeStep)
@@ -90,10 +92,11 @@ void Slider::OnHover(const IntVector2& position, const IntVector2& screenPositio
 
     // If not hovering on the knob, send it as page event
     if (!hovering_)
-        Page(position, buttons & MOUSEB_LEFT);
+        Page(position, (bool)(buttons & MOUSEB_LEFT));
 }
 
-void Slider::OnClickBegin(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers, Cursor* cursor)
+void Slider::OnClickBegin(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers,
+    Cursor* cursor)
 {
     selected_ = true;
     hovering_ = knob_->IsInside(screenPosition, true);
@@ -101,7 +104,8 @@ void Slider::OnClickBegin(const IntVector2& position, const IntVector2& screenPo
         Page(position, true);
 }
 
-void Slider::OnClickEnd(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers, Cursor* cursor, UIElement* beginElement)
+void Slider::OnClickEnd(const IntVector2& position, const IntVector2& screenPosition, int button, int buttons, int qualifiers,
+    Cursor* cursor, UIElement* beginElement)
 {
     hovering_ = knob_->IsInside(screenPosition, true);
     if (!hovering_ && button == MOUSEB_LEFT)
@@ -120,12 +124,13 @@ void Slider::OnDragBegin(const IntVector2& position, const IntVector2& screenPos
     }
 }
 
-void Slider::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons, int qualifiers, Cursor* cursor)
+void Slider::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons,
+    int qualifiers, Cursor* cursor)
 {
     if (!editable_ || !dragSlider_ || GetSize() == knob_->GetSize())
         return;
 
-    float newValue = value_;
+    float newValue;
     IntVector2 delta = position - dragBeginCursor_;
 
     if (orientation_ == O_HORIZONTAL)
@@ -265,7 +270,8 @@ void Slider::Page(const IntVector2& position, bool pressed)
     eventData[P_OFFSET] = offset;
 
     // Start transmitting repeated pages after the initial press
-    if (selected_ && pressed && repeatRate_ > 0.0f && repeatTimer_.GetMSec(false) >= Lerp(1000.0f / repeatRate_, 0, Abs(offset) / length))
+    if (selected_ && pressed && repeatRate_ > 0.0f &&
+        repeatTimer_.GetMSec(false) >= Lerp(1000.0f / repeatRate_, 0.0f, Abs(offset) / length))
         repeatTimer_.Reset();
     else
         pressed = false;

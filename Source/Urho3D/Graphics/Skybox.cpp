@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,11 +20,13 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
+#include "../Core/Context.h"
 #include "../Graphics/Batch.h"
 #include "../Graphics/Camera.h"
-#include "../Core/Context.h"
-#include "../Scene/Node.h"
 #include "../Graphics/Skybox.h"
+#include "../Scene/Node.h"
 
 #include "../DebugNew.h"
 
@@ -47,7 +49,7 @@ void Skybox::RegisterObject(Context* context)
 {
     context->RegisterFactory<Skybox>(GEOMETRY_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(StaticModel);
+    URHO3D_COPY_BASE_ATTRIBUTES(StaticModel);
 }
 
 void Skybox::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQueryResult>& results)

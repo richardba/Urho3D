@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+#include "../Precompiled.h"
 
 #include "../IO/File.h"
 #include "../IO/Log.h"
@@ -50,18 +52,18 @@ PackageFile::~PackageFile()
 
 bool PackageFile::Open(const String& fileName, unsigned startOffset)
 {
-    #ifdef ANDROID
-    if (fileName.StartsWith("/apk/"))
+#ifdef ANDROID
+    if (URHO3D_IS_ASSET(fileName))
     {
-        LOGERROR("Package files within the apk are not supported on Android");
+        URHO3D_LOGERROR("Package files within the apk are not supported on Android");
         return false;
     }
-    #endif
-    
+#endif
+
     SharedPtr<File> file(new File(context_, fileName));
     if (!file->IsOpen())
         return false;
-    
+
     // Check ID, then read the directory
     file->Seek(startOffset);
     String id = file->ReadFileID();
@@ -72,7 +74,7 @@ bool PackageFile::Open(const String& fileName, unsigned startOffset)
         if (!startOffset)
         {
             unsigned fileSize = file->GetSize();
-            file->Seek(fileSize - sizeof(unsigned));
+            file->Seek((unsigned)(fileSize - sizeof(unsigned)));
             unsigned newStartOffset = fileSize - file->ReadUInt();
             if (newStartOffset < fileSize)
             {
@@ -81,22 +83,22 @@ bool PackageFile::Open(const String& fileName, unsigned startOffset)
                 id = file->ReadFileID();
             }
         }
-        
+
         if (id != "UPAK" && id != "ULZ4")
         {
-            LOGERROR(fileName + " is not a valid package file");
+            URHO3D_LOGERROR(fileName + " is not a valid package file");
             return false;
         }
     }
-    
+
     fileName_ = fileName;
     nameHash_ = fileName_;
     totalSize_ = file->GetSize();
     compressed_ = id == "ULZ4";
-    
+
     unsigned numFiles = file->ReadUInt();
     checksum_ = file->ReadUInt();
-    
+
     for (unsigned i = 0; i < numFiles; ++i)
     {
         String entryName = file->ReadString();
@@ -105,26 +107,58 @@ bool PackageFile::Open(const String& fileName, unsigned startOffset)
         newEntry.size_ = file->ReadUInt();
         newEntry.checksum_ = file->ReadUInt();
         if (!compressed_ && newEntry.offset_ + newEntry.size_ > totalSize_)
-            LOGERROR("File entry " + entryName + " outside package file");
+        {
+            URHO3D_LOGERROR("File entry " + entryName + " outside package file");
+            return false;
+        }
         else
-            entries_[entryName.ToLower()] = newEntry;
+            entries_[entryName] = newEntry;
     }
-    
+
     return true;
 }
 
 bool PackageFile::Exists(const String& fileName) const
 {
-    return entries_.Find(fileName.ToLower()) != entries_.End();
+    bool found = entries_.Find(fileName) != entries_.End();
+
+#ifdef _WIN32
+    // On Windows perform a fallback case-insensitive search
+    if (!found)
+    {
+        for (HashMap<String, PackageEntry>::ConstIterator i = entries_.Begin(); i != entries_.End(); ++i)
+        {
+            if (!i->first_.Compare(fileName, false))
+            {
+                found = true;
+                break;
+            }
+        }
+    }
+#endif
+
+    return found;
 }
 
 const PackageEntry* PackageFile::GetEntry(const String& fileName) const
 {
-    HashMap<String, PackageEntry>::ConstIterator i = entries_.Find(fileName.ToLower());
+    HashMap<String, PackageEntry>::ConstIterator i = entries_.Find(fileName);
     if (i != entries_.End())
         return &i->second_;
+
+#ifdef _WIN32
+    // On Windows perform a fallback case-insensitive search
     else
-        return 0;
+    {
+        for (HashMap<String, PackageEntry>::ConstIterator j = entries_.Begin(); j != entries_.End(); ++j)
+        {
+            if (!j->first_.Compare(fileName, false))
+                return &j->second_;
+        }
+    }
+#endif
+
+    return 0;
 }
 
 }

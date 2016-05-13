@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,7 @@ class XMLFile;
 /// %Console window with log history and command line prompt.
 class URHO3D_API Console : public Object
 {
-    OBJECT(Console);
+    URHO3D_OBJECT(Console, Object);
 
 public:
     /// Construct.
@@ -55,10 +55,13 @@ public:
     void SetVisible(bool enable);
     /// Toggle visibility.
     void Toggle();
+
     /// Automatically set console to visible when receiving an error log message.
     void SetAutoVisibleOnError(bool enable) { autoVisibleOnError_ = enable; }
+
     /// Set the command interpreter.
     void SetCommandInterpreter(const String& interpreter) { commandInterpreter_ = interpreter; }
+
     /// Set number of buffered rows.
     void SetNumBufferedRows(unsigned rows);
     /// Set number of displayed rows.
@@ -72,30 +75,43 @@ public:
 
     /// Return the UI style file.
     XMLFile* GetDefaultStyle() const;
+
     /// Return the background element.
     BorderImage* GetBackground() const { return background_; }
+
     /// Return the line edit element.
     LineEdit* GetLineEdit() const { return lineEdit_; }
+
     /// Return the close butoon element.
     Button* GetCloseButton() const { return closeButton_; }
+
     /// Return whether is visible.
     bool IsVisible() const;
+
     /// Return true when console is set to automatically visible when receiving an error log message.
     bool IsAutoVisibleOnError() const { return autoVisibleOnError_; }
+
     /// Return the last used command interpreter.
     const String& GetCommandInterpreter() const { return commandInterpreter_; }
+
     /// Return number of buffered rows.
     unsigned GetNumBufferedRows() const;
+
     /// Return number of displayed rows.
     unsigned GetNumRows() const { return displayedRows_; }
+
     /// Copy selected rows to system clipboard.
     void CopySelectedRows() const;
+
     /// Return history maximum size.
     unsigned GetNumHistoryRows() const { return historyRows_; }
+
     /// Return current history position.
     unsigned GetHistoryPosition() const { return historyPosition_; }
+
     /// Return history row at index.
     const String& GetHistoryRow(unsigned index) const;
+
     /// Return whether automatically focuses the line edit when showing.
     bool GetFocusOnShow() const { return focusOnShow_; }
 
@@ -110,8 +126,8 @@ private:
     void HandleLineEditKey(StringHash eventType, VariantMap& eventData);
     /// Handle close button being pressed.
     void HandleCloseButtonPressed(StringHash eventType, VariantMap& eventData);
-    /// Handle rendering window resize.
-    void HandleScreenMode(StringHash eventType, VariantMap& eventData);
+    /// Handle UI root resize.
+    void HandleRootElementResized(StringHash eventType, VariantMap& eventData);
     /// Handle a log message.
     void HandleLogMessage(StringHash eventType, VariantMap& eventData);
     /// Handle the application post-update.

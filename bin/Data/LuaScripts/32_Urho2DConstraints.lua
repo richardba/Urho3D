@@ -20,6 +20,8 @@ function Start()
     CreateScene()
     input.mouseVisible = true -- Show mouse cursor
     CreateInstructions()
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_FREE)
     SubscribeToEvents()
 end
 
@@ -351,7 +353,7 @@ function SubscribeToEvents()
 end
 
 function HandleUpdate(eventType, eventData)
-    local timestep = eventData:GetFloat("TimeStep")
+    local timestep = eventData["TimeStep"]:GetFloat()
     MoveCamera(timestep) -- Move the camera according to frame's time step
     if input:GetKeyPress(KEY_SPACE) then drawDebug = not drawDebug end -- Toggle debug geometry with space
     if input:GetKeyPress(KEY_F5) then scene_:SaveXML(fileSystem:GetProgramDir().."Data/Scenes/Constraints.xml") end -- Save scene
@@ -364,7 +366,7 @@ end
 function HandleMouseButtonDown(eventType, eventData)
     local rigidBody = physicsWorld:GetRigidBody(input.mousePosition.x, input.mousePosition.y) -- Raycast for RigidBody2Ds to pick
     if rigidBody ~= nil then
-        pickedNode = rigidBody:GetNode()
+        pickedNode = rigidBody.node
         local staticSprite = pickedNode:GetComponent("StaticSprite2D")
         staticSprite.color = Color(1, 0, 0, 1) -- Temporary modify color of the picked sprite
 
@@ -406,16 +408,16 @@ function HandleMouseMove(eventType, eventData)
 end
 
 function HandleTouchBegin3(eventType, eventData)
-    local rigidBody = physicsWorld:GetRigidBody(eventData:GetInt("X"), eventData:GetInt("Y")) -- Raycast for RigidBody2Ds to pick
+    local rigidBody = physicsWorld:GetRigidBody(eventData["X"]:GetInt(), eventData["Y"]:GetInt()) -- Raycast for RigidBody2Ds to pick
     if rigidBody ~= nil then
-        pickedNode = rigidBody:GetNode()
+        pickedNode = rigidBody.node
         local staticSprite = pickedNode:GetComponent("StaticSprite2D")
         staticSprite.color = Color(1, 0, 0, 1) -- Temporary modify color of the picked sprite
         local rigidBody = pickedNode:GetComponent("RigidBody2D")
 
         -- ConstraintMouse2D - Temporary apply this constraint to the pickedNode to allow grasping and moving with touch
         local constraintMouse = pickedNode:CreateComponent("ConstraintMouse2D")
-        constraintMouse.target = camera:ScreenToWorldPoint(Vector3(eventData:GetInt("X") / graphics.width, eventData:GetInt("Y") / graphics.height, 0))
+        constraintMouse.target = camera:ScreenToWorldPoint(Vector3(eventData["X"]:GetInt() / graphics.width, eventData["Y"]:GetInt() / graphics.height, 0))
         constraintMouse.maxForce = 1000 * rigidBody.mass
         constraintMouse.collideConnected = true
         constraintMouse.otherBody = dummyBody  -- Use dummy body instead of rigidBody. It's better to create a dummy body automatically in ConstraintMouse2D
@@ -428,7 +430,7 @@ end
 function HandleTouchMove3(eventType, eventData)
     if pickedNode ~= nil then
         local constraintMouse = pickedNode:GetComponent("ConstraintMouse2D")
-        constraintMouse.target = camera:ScreenToWorldPoint(Vector3(eventData:GetInt("X") / graphics.width, eventData:GetInt("Y") / graphics.height, 0))
+        constraintMouse.target = camera:ScreenToWorldPoint(Vector3(eventData["X"]:GetInt() / graphics.width, eventData["Y"]:GetInt() / graphics.height, 0))
     end
 end
 

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,8 +20,10 @@
 // THE SOFTWARE.
 //
 
-#include "../Urho2D/ConstraintDistance2D.h"
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
+#include "../Urho2D/ConstraintDistance2D.h"
 #include "../Urho2D/PhysicsUtils2D.h"
 #include "../Urho2D/RigidBody2D.h"
 
@@ -29,6 +31,8 @@
 
 namespace Urho3D
 {
+
+extern const char* URHO2D_CATEGORY;
 
 ConstraintDistance2D::ConstraintDistance2D(Context* context) :
     Constraint2D(context),
@@ -44,14 +48,14 @@ ConstraintDistance2D::~ConstraintDistance2D()
 
 void ConstraintDistance2D::RegisterObject(Context* context)
 {
-    context->RegisterFactory<ConstraintDistance2D>();
-    
-    ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Owner Body Anchor", GetOwnerBodyAnchor, SetOwnerBodyAnchor, Vector2, Vector2::ZERO, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Other Body Anchor", GetOtherBodyAnchor, SetOtherBodyAnchor, Vector2, Vector2::ZERO, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Frequency Hz", GetFrequencyHz, SetFrequencyHz, float, 0.0f, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Damping Ratio", GetDampingRatio, SetDampingRatio, float, 0.0f, AM_DEFAULT);
-    COPY_BASE_ATTRIBUTES(Constraint2D);
+    context->RegisterFactory<ConstraintDistance2D>(URHO2D_CATEGORY);
+
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Owner Body Anchor", GetOwnerBodyAnchor, SetOwnerBodyAnchor, Vector2, Vector2::ZERO, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Other Body Anchor", GetOtherBodyAnchor, SetOtherBodyAnchor, Vector2, Vector2::ZERO, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Frequency Hz", GetFrequencyHz, SetFrequencyHz, float, 0.0f, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Damping Ratio", GetDampingRatio, SetDampingRatio, float, 0.0f, AM_DEFAULT);
+    URHO3D_COPY_BASE_ATTRIBUTES(Constraint2D);
 }
 
 void ConstraintDistance2D::SetOwnerBodyAnchor(const Vector2& anchor)

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@ namespace Urho3D
 /// %Menu %UI element that optionally shows a popup.
 class URHO3D_API Menu : public Button
 {
-    OBJECT(Menu);
+    URHO3D_OBJECT(Menu, Button);
 
     using UIElement::LoadXML;
 
@@ -53,8 +53,9 @@ public:
     virtual void OnHover(const IntVector2& position, const IntVector2& screenPosition, int buttons, int qualifiers, Cursor* cursor);
     /// React to the popup being shown.
     virtual void OnShowPopup();
+
     /// React to the popup being hidden.
-    virtual void OnHidePopup() {}
+    virtual void OnHidePopup() { }
 
     /// Set popup element to show on selection.
     void SetPopup(UIElement* element);
@@ -69,12 +70,16 @@ public:
 
     /// Return popup element.
     UIElement* GetPopup() const { return popup_; }
+
     /// Return popup element offset.
     const IntVector2& GetPopupOffset() const { return popupOffset_; }
+
     /// Return whether popup is open.
     bool GetShowPopup() const { return showPopup_; }
+
     /// Return accelerator key code, 0 if disabled.
     int GetAcceleratorKey() const { return acceleratorKey_; }
+
     /// Return accelerator qualifiers.
     int GetAcceleratorQualifiers() const { return acceleratorQualifiers_; }
 

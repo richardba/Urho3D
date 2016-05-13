@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,13 +20,13 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/CoreEvents.h"
-#include "../IO/Log.h"
 #include "../Core/ProcessUtils.h"
 #include "../Core/Profiler.h"
-#include "../Core/Thread.h"
-#include "../Core/Timer.h"
 #include "../Core/WorkQueue.h"
+#include "../IO/Log.h"
 
 namespace Urho3D
 {
@@ -41,7 +41,7 @@ public:
         index_(index)
     {
     }
-    
+
     /// Process work items until stopped.
     virtual void ThreadFunction()
     {
@@ -49,10 +49,10 @@ public:
         InitFPU();
         owner_->ProcessItems(index_);
     }
-    
+
     /// Return thread index.
     unsigned GetIndex() const { return index_; }
-    
+
 private:
     /// Work queue.
     WorkQueue* owner_;
@@ -65,11 +65,12 @@ WorkQueue::WorkQueue(Context* context) :
     shutDown_(false),
     pausing_(false),
     paused_(false),
+    completing_(false),
     tolerance_(10),
     lastSize_(0),
     maxNonThreadedWorkMs_(5)
 {
-    SubscribeToEvent(E_BEGINFRAME, HANDLER(WorkQueue, HandleBeginFrame));
+    SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(WorkQueue, HandleBeginFrame));
 }
 
 WorkQueue::~WorkQueue()
@@ -77,27 +78,31 @@ WorkQueue::~WorkQueue()
     // Stop the worker threads. First make sure they are not waiting for work items
     shutDown_ = true;
     Resume();
-    
+
     for (unsigned i = 0; i < threads_.Size(); ++i)
         threads_[i]->Stop();
 }
 
 void WorkQueue::CreateThreads(unsigned numThreads)
 {
+#ifdef URHO3D_THREADING
     // Other subsystems may initialize themselves according to the number of threads.
     // Therefore allow creating the threads only once, after which the amount is fixed
     if (!threads_.Empty())
         return;
-    
+
     // Start threads in paused mode
     Pause();
-    
+
     for (unsigned i = 0; i < numThreads; ++i)
     {
         SharedPtr<WorkerThread> thread(new WorkerThread(this, i + 1));
         thread->Run();
         threads_.Push(thread);
     }
+#else
+    URHO3D_LOGERROR("Can not create worker threads as threading is disabled");
+#endif
 }
 
 SharedPtr<WorkItem> WorkQueue::GetFreeItem()
@@ -121,13 +126,13 @@ void WorkQueue::AddWorkItem(SharedPtr<WorkItem> item)
 {
     if (!item)
     {
-        LOGERROR("Null work item submitted to the work queue");
+        URHO3D_LOGERROR("Null work item submitted to the work queue");
         return;
     }
-    
+
     // Check for duplicate items.
     assert(!workItems_.Contains(item));
-    
+
     // Push to the main thread list to keep item alive
     // Clear completed flag in case item is reused
     workItems_.Push(item);
@@ -136,7 +141,7 @@ void WorkQueue::AddWorkItem(SharedPtr<WorkItem> item)
     // Make sure worker threads' list is safe to modify
     if (threads_.Size() && !paused_)
         queueMutex_.Acquire();
-    
+
     // Find position for new item
     if (queue_.Empty())
         queue_.Push(item);
@@ -151,7 +156,7 @@ void WorkQueue::AddWorkItem(SharedPtr<WorkItem> item)
             }
         }
     }
-    
+
     if (threads_.Size())
     {
         queueMutex_.Release();
@@ -159,15 +164,63 @@ void WorkQueue::AddWorkItem(SharedPtr<WorkItem> item)
     }
 }
 
+bool WorkQueue::RemoveWorkItem(SharedPtr<WorkItem> item)
+{
+    if (!item)
+        return false;
+
+    MutexLock lock(queueMutex_);
+
+    // Can only remove successfully if the item was not yet taken by threads for execution
+    List<WorkItem*>::Iterator i = queue_.Find(item.Get());
+    if (i != queue_.End())
+    {
+        List<SharedPtr<WorkItem> >::Iterator j = workItems_.Find(item);
+        if (j != workItems_.End())
+        {
+            queue_.Erase(i);
+            ReturnToPool(item);
+            workItems_.Erase(j);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+unsigned WorkQueue::RemoveWorkItems(const Vector<SharedPtr<WorkItem> >& items)
+{
+    MutexLock lock(queueMutex_);
+    unsigned removed = 0;
+
+    for (Vector<SharedPtr<WorkItem> >::ConstIterator i = items.Begin(); i != items.End(); ++i)
+    {
+        List<WorkItem*>::Iterator j = queue_.Find(i->Get());
+        if (j != queue_.End())
+        {
+            List<SharedPtr<WorkItem> >::Iterator k = workItems_.Find(*i);
+            if (k != workItems_.End())
+            {
+                queue_.Erase(j);
+                ReturnToPool(*k);
+                workItems_.Erase(k);
+                ++removed;
+            }
+        }
+    }
+
+    return removed;
+}
+
 void WorkQueue::Pause()
 {
     if (!paused_)
     {
         pausing_ = true;
-        
+
         queueMutex_.Acquire();
         paused_ = true;
-        
+
         pausing_ = false;
     }
 }
@@ -184,10 +237,12 @@ void WorkQueue::Resume()
 
 void WorkQueue::Complete(unsigned priority)
 {
+    completing_ = true;
+
     if (threads_.Size())
     {
         Resume();
-        
+
         // Take work items also in the main thread until queue empty or no high-priority items anymore
         while (!queue_.Empty())
         {
@@ -206,12 +261,12 @@ void WorkQueue::Complete(unsigned priority)
                 break;
             }
         }
-        
+
         // Wait for threaded work to complete
         while (!IsCompleted(priority))
         {
         }
-        
+
         // If no work at all remaining, pause worker threads by leaving the mutex locked
         if (queue_.Empty())
             Pause();
@@ -227,8 +282,9 @@ void WorkQueue::Complete(unsigned priority)
             item->completed_ = true;
         }
     }
-    
+
     PurgeCompleted(priority);
+    completing_ = false;
 }
 
 bool WorkQueue::IsCompleted(unsigned priority) const
@@ -238,19 +294,19 @@ bool WorkQueue::IsCompleted(unsigned priority) const
         if ((*i)->priority_ >= priority && !(*i)->completed_)
             return false;
     }
-    
+
     return true;
 }
 
 void WorkQueue::ProcessItems(unsigned threadIndex)
 {
     bool wasActive = false;
-    
+
     for (;;)
     {
         if (shutDown_)
             return;
-        
+
         if (pausing_ && !wasActive)
             Time::Sleep(0);
         else
@@ -259,7 +315,7 @@ void WorkQueue::ProcessItems(unsigned threadIndex)
             if (!queue_.Empty())
             {
                 wasActive = true;
-                
+
                 WorkItem* item = queue_.Front();
                 queue_.PopFront();
                 queueMutex_.Release();
@@ -269,7 +325,7 @@ void WorkQueue::ProcessItems(unsigned threadIndex)
             else
             {
                 wasActive = false;
-                
+
                 queueMutex_.Release();
                 Time::Sleep(0);
             }
@@ -289,30 +345,13 @@ void WorkQueue::PurgeCompleted(unsigned priority)
             if ((*i)->sendEvent_)
             {
                 using namespace WorkItemCompleted;
-                
+
                 VariantMap& eventData = GetEventDataMap();
                 eventData[P_ITEM] = i->Get();
                 SendEvent(E_WORKITEMCOMPLETED, eventData);
             }
 
-            // Check if this was a pooled item and set it to usable
-            if ((*i)->pooled_)
-            {
-                // Reset the values to their defaults. This should 
-                // be safe to do here as the completed event has 
-                // already been handled and this is part of the 
-                // internal pool.
-                (*i)->start_ = NULL;
-                (*i)->end_ = NULL;
-                (*i)->aux_ = NULL;
-                (*i)->workFunction_ = NULL;
-                (*i)->priority_ = M_MAX_UNSIGNED;
-                (*i)->sendEvent_ = false;
-                (*i)->completed_ = false;
-
-                poolItems_.Push(*i);
-            }
-
+            ReturnToPool(*i);
             i = workItems_.Erase(i);
         }
         else
@@ -332,15 +371,36 @@ void WorkQueue::PurgePool()
     lastSize_ = currentSize;
 }
 
+void WorkQueue::ReturnToPool(SharedPtr<WorkItem>& item)
+{
+    // Check if this was a pooled item and set it to usable
+    if (item->pooled_)
+    {
+        // Reset the values to their defaults. This should 
+        // be safe to do here as the completed event has
+        // already been handled and this is part of the
+        // internal pool.
+        item->start_ = 0;
+        item->end_ = 0;
+        item->aux_ = 0;
+        item->workFunction_ = 0;
+        item->priority_ = M_MAX_UNSIGNED;
+        item->sendEvent_ = false;
+        item->completed_ = false;
+
+        poolItems_.Push(item);
+    }
+}
+
 void WorkQueue::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
 {
     // If no worker threads, complete low-priority work here
     if (threads_.Empty() && !queue_.Empty())
     {
-        PROFILE(CompleteWorkNonthreaded);
-        
+        URHO3D_PROFILE(CompleteWorkNonthreaded);
+
         HiresTimer timer;
-        
+
         while (!queue_.Empty() && timer.GetUSec(false) < maxNonThreadedWorkMs_ * 1000)
         {
             WorkItem* item = queue_.Front();
@@ -349,7 +409,7 @@ void WorkQueue::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
             item->completed_ = true;
         }
     }
-    
+
     // Complete and signal items down to the lowest priority
     PurgeCompleted(0);
     PurgePool();

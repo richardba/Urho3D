@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,20 +20,16 @@
 // THE SOFTWARE.
 //
 
-#include <Urho3D/Urho3D.h>
-
 #include <Urho3D/Core/Context.h>
 #include <Urho3D/Container/ArrayPtr.h>
+#include <Urho3D/Core/ProcessUtils.h>
 #include <Urho3D/IO/File.h>
 #include <Urho3D/IO/FileSystem.h>
-#include <Urho3D/Core/ProcessUtils.h>
 
 #ifdef WIN32
 #include <windows.h>
 #endif
 
-#include <cstdio>
-#include <cstring>
 #include <LZ4/lz4.h>
 #include <LZ4/lz4hc.h>
 
@@ -95,6 +91,8 @@ void Run(const Vector<String>& arguments)
             "Options:\n"
             "-c      Enable package file LZ4 compression\n"
             "-q      Enable quiet mode\n"
+            "\n"
+            "Basepath is an optional prefix that will be added to the file entries.\n"
         );
 
     const String& dirName = arguments[0];
@@ -184,7 +182,7 @@ void WritePackageFile(const String& fileName, const String& rootDir)
     for (unsigned i = 0; i < entries_.Size(); ++i)
     {
         // Write entry (correct offset is still unknown, will be filled in later)
-        dest.WriteString(entries_[i].name_);
+        dest.WriteString(basePath_ + entries_[i].name_);
         dest.WriteUInt(entries_[i].offset_);
         dest.WriteUInt(entries_[i].size_);
         dest.WriteUInt(entries_[i].checksum_);
@@ -262,7 +260,7 @@ void WritePackageFile(const String& fileName, const String& rootDir)
 
     for (unsigned i = 0; i < entries_.Size(); ++i)
     {
-        dest.WriteString(entries_[i].name_);
+        dest.WriteString(basePath_ + entries_[i].name_);
         dest.WriteUInt(entries_[i].offset_);
         dest.WriteUInt(entries_[i].size_);
         dest.WriteUInt(entries_[i].checksum_);

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,9 @@
 
 #pragma once
 
+#include "../Core/Variant.h"
 #include "../Math/BoundingBox.h"
 #include "../Math/Rect.h"
-#include "../Core/Variant.h"
 
 namespace Urho3D
 {
@@ -39,7 +39,7 @@ public:
     Deserializer(unsigned size);
     /// Destruct.
     virtual ~Deserializer();
-    
+
     /// Read bytes from the stream. Return number of bytes actually read.
     virtual unsigned Read(void* dest, unsigned size) = 0;
     /// Set position from the beginning of the stream.
@@ -48,13 +48,16 @@ public:
     virtual const String& GetName() const;
     /// Return a checksum if applicable.
     virtual unsigned GetChecksum();
+
     /// Return current position.
     unsigned GetPosition() const { return position_; }
+
     /// Return size.
     unsigned GetSize() const { return size_; }
+
     /// Return whether the end of stream has been reached.
     bool IsEof() const { return position_ >= size_; }
-    
+
     /// Read a 32-bit integer.
     int ReadInt();
     /// Read a 16-bit integer.
@@ -71,6 +74,8 @@ public:
     bool ReadBool();
     /// Read a float.
     float ReadFloat();
+    /// Read a double.
+    double ReadDouble();
     /// Read an IntRect.
     IntRect ReadIntRect();
     /// Read an IntVector2.
@@ -117,6 +122,8 @@ public:
     Variant ReadVariant(VariantType type);
     /// Read a variant vector.
     VariantVector ReadVariantVector();
+    /// Read a string vector.
+    StringVector ReadStringVector();
     /// Read a variant map.
     VariantMap ReadVariantMap();
     /// Read a variable-length encoded unsigned integer, which can use 29 bits maximum.
@@ -125,7 +132,7 @@ public:
     unsigned ReadNetID();
     /// Read a text line.
     String ReadLine();
-    
+
 protected:
     /// Stream position.
     unsigned position_;

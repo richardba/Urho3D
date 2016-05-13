@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,14 +20,18 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
+#include "../Core/Profiler.h"
+#include "../Graphics/Texture2D.h"
+#include "../IO/Log.h"
+#include "../Resource/ResourceCache.h"
 #include "../UI/Font.h"
 #include "../UI/FontFace.h"
-#include "../IO/Log.h"
-#include "../Core/Profiler.h"
-#include "../Resource/ResourceCache.h"
 #include "../UI/Text.h"
-#include "../Graphics/Texture2D.h"
+#include "../Resource/Localization.h"
+#include "../Resource/ResourceEvents.h"
 
 #include "../DebugNew.h"
 
@@ -49,11 +53,11 @@ extern const char* UI_CATEGORY;
 
 Text::Text(Context* context) :
     UIElement(context),
-    usedInText3D_(false),
     fontSize_(DEFAULT_FONT_SIZE),
     textAlignment_(HA_LEFT),
     rowSpacing_(1.0f),
     wordWrap_(false),
+    autoLocalizable_(false),
     charLocationsDirty_(true),
     selectionStart_(0),
     selectionLength_(0),
@@ -76,18 +80,19 @@ void Text::RegisterObject(Context* context)
 {
     context->RegisterFactory<Text>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(UIElement);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Use Derived Opacity", false);
-    MIXED_ACCESSOR_ATTRIBUTE("Font", GetFontAttr, SetFontAttr, ResourceRef, ResourceRef(Font::GetTypeStatic()), AM_FILE);
-    ATTRIBUTE("Font Size", int, fontSize_, DEFAULT_FONT_SIZE, AM_FILE);
-    ATTRIBUTE("Text", String, text_, String::EMPTY, AM_FILE);
-    ENUM_ATTRIBUTE("Text Alignment", textAlignment_, horizontalAlignments, HA_LEFT, AM_FILE);
-    ATTRIBUTE("Row Spacing", float, rowSpacing_, 1.0f, AM_FILE);
-    ATTRIBUTE("Word Wrap", bool, wordWrap_, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Selection Color", GetSelectionColor, SetSelectionColor, Color, Color::TRANSPARENT, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Hover Color", GetHoverColor, SetHoverColor, Color, Color::TRANSPARENT, AM_FILE);
-    ENUM_ATTRIBUTE("Text Effect", textEffect_, textEffects, TE_NONE, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Effect Color", GetEffectColor, SetEffectColor, Color, Color::BLACK, AM_FILE);
+    URHO3D_COPY_BASE_ATTRIBUTES(UIElement);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Use Derived Opacity", false);
+    URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Font", GetFontAttr, SetFontAttr, ResourceRef, ResourceRef(Font::GetTypeStatic()), AM_FILE);
+    URHO3D_ATTRIBUTE("Font Size", int, fontSize_, DEFAULT_FONT_SIZE, AM_FILE);
+    URHO3D_ATTRIBUTE("Text", String, text_, String::EMPTY, AM_FILE);
+    URHO3D_ENUM_ATTRIBUTE("Text Alignment", textAlignment_, horizontalAlignments, HA_LEFT, AM_FILE);
+    URHO3D_ATTRIBUTE("Row Spacing", float, rowSpacing_, 1.0f, AM_FILE);
+    URHO3D_ATTRIBUTE("Word Wrap", bool, wordWrap_, false, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Auto Localizable", GetAutoLocalizable, SetAutoLocalizable, bool, false, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Selection Color", GetSelectionColor, SetSelectionColor, Color, Color::TRANSPARENT, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Hover Color", GetHoverColor, SetHoverColor, Color, Color::TRANSPARENT, AM_FILE);
+    URHO3D_ENUM_ATTRIBUTE("Text Effect", textEffect_, textEffects, TE_NONE, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Effect Color", GetEffectColor, SetEffectColor, Color, Color::BLACK, AM_FILE);
 
     // Change the default value for UseDerivedOpacity
     context->GetAttribute<Text>("Use Derived Opacity")->defaultValue_ = false;
@@ -97,10 +102,7 @@ void Text::ApplyAttributes()
 {
     UIElement::ApplyAttributes();
 
-    // Decode to Unicode now
-    unicodeText_.Clear();
-    for (unsigned i = 0; i < text_.Length();)
-        unicodeText_.Push(text_.NextUTF8Char(i));
+    DecodeToUnicode();
 
     fontSize_ = Max(fontSize_, 1);
     ValidateSelection();
@@ -131,8 +133,8 @@ void Text::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData,
     {
         bool both = hovering_ && selected_ && hoverColor_.a_ > 0.0 && selectionColor_.a_ > 0.0f;
         UIBatch batch(this, BLEND_ALPHA, currentScissor, 0, &vertexData);
-        batch.SetColor(both ? selectionColor_.Lerp(hoverColor_, 0.5f) : (selected_ && selectionColor_.a_ > 0.0f ?
-            selectionColor_: hoverColor_));
+        batch.SetColor(both ? selectionColor_.Lerp(hoverColor_, 0.5f) :
+            (selected_ && selectionColor_.a_ > 0.0f ? selectionColor_ : hoverColor_));
         batch.AddQuad(0, 0, GetWidth(), GetHeight(), 0, 0);
         UIBatch::AddOrMerge(batch, batches);
     }
@@ -152,8 +154,8 @@ void Text::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData,
             {
                 if (charLocations_[i].position_.y_ != currentStart.y_)
                 {
-                    batch.AddQuad(currentStart.x_, currentStart.y_, currentEnd.x_ - currentStart.x_, currentEnd.y_ - currentStart.y_,
-                        0, 0);
+                    batch.AddQuad(currentStart.x_, currentStart.y_, currentEnd.x_ - currentStart.x_,
+                        currentEnd.y_ - currentStart.y_, 0, 0);
                     currentStart = charLocations_[i].position_;
                     currentEnd = currentStart + charLocations_[i].size_;
                 }
@@ -166,8 +168,7 @@ void Text::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData,
         }
         if (currentEnd != currentStart)
         {
-            batch.AddQuad(currentStart.x_, currentStart.y_, currentEnd.x_ - currentStart.x_, currentEnd.y_ - currentStart.y_,
-                0, 0);
+            batch.AddQuad(currentStart.x_, currentStart.y_, currentEnd.x_ - currentStart.x_, currentEnd.y_ - currentStart.y_, 0, 0);
         }
 
         UIBatch::AddOrMerge(batch, batches);
@@ -237,7 +238,7 @@ bool Text::SetFont(Font* font, int size)
 {
     if (!font)
     {
-        LOGERROR("Null font for Text");
+        URHO3D_LOGERROR("Null font for Text");
         return false;
     }
 
@@ -251,15 +252,27 @@ bool Text::SetFont(Font* font, int size)
     return true;
 }
 
-void Text::SetText(const String& text)
+void Text::DecodeToUnicode()
 {
-    text_ = text;
-
-    // Decode to Unicode now
     unicodeText_.Clear();
     for (unsigned i = 0; i < text_.Length();)
         unicodeText_.Push(text_.NextUTF8Char(i));
+}
 
+void Text::SetText(const String& text)
+{
+    if (autoLocalizable_)
+    {
+        stringId_ = text;
+        Localization* l10n = GetSubsystem<Localization>();
+        text_ = l10n->Get(stringId_);
+    }
+    else
+    {
+        text_ = text;
+    }
+
+    DecodeToUnicode();
     ValidateSelection();
     UpdateText();
 }
@@ -289,6 +302,39 @@ void Text::SetWordwrap(bool enable)
         wordWrap_ = enable;
         UpdateText();
     }
+}
+
+void Text::SetAutoLocalizable(bool enable)
+{
+    if (enable != autoLocalizable_)
+    {
+        autoLocalizable_ = enable;
+        if (enable)
+        {
+            stringId_ = text_;
+            Localization* l10n = GetSubsystem<Localization>();
+            text_ = l10n->Get(stringId_);
+            SubscribeToEvent(E_CHANGELANGUAGE, URHO3D_HANDLER(Text, HandleChangeLanguage));
+        }
+        else
+        {
+            text_ = stringId_;
+            stringId_ = "";
+            UnsubscribeFromEvent(E_CHANGELANGUAGE);
+        }
+        DecodeToUnicode();
+        ValidateSelection();
+        UpdateText();
+    }
+}
+
+void Text::HandleChangeLanguage(StringHash eventType, VariantMap& eventData)
+{
+    Localization* l10n = GetSubsystem<Localization>();
+    text_ = l10n->Get(stringId_);
+    DecodeToUnicode();
+    ValidateSelection();
+    UpdateText();
 }
 
 void Text::SetSelection(unsigned start, unsigned length)
@@ -322,11 +368,6 @@ void Text::SetTextEffect(TextEffect textEffect)
 void Text::SetEffectColor(const Color& effectColor)
 {
     effectColor_ = effectColor;
-}
-
-void Text::SetUsedInText3D(bool usedInText3D)
-{
-    usedInText3D_ = usedInText3D;
 }
 
 void Text::SetEffectDepthBias(float bias)
@@ -484,7 +525,7 @@ void Text::UpdateText(bool onResize)
                             printToText_.Pop();
                         }
                         printText_.Push('\n');
-                        printToText_.Push(Min((int)i, (int)unicodeText_.Size() - 1));
+                        printToText_.Push(Min(i, unicodeText_.Size() - 1));
                         rowWidth = 0;
                         nextBreak = lineStart = i;
                     }
@@ -510,7 +551,7 @@ void Text::UpdateText(bool onResize)
                 else
                 {
                     printText_.Push('\n');
-                    printToText_.Push(Min((int)i, (int)unicodeText_.Size() - 1));
+                    printToText_.Push(Min(i, unicodeText_.Size() - 1));
                     rowWidth = 0;
                     nextBreak = lineStart = i;
                 }

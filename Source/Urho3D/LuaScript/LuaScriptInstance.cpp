@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,24 +20,24 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/CoreEvents.h"
 #include "../Core/Context.h"
+#include "../Core/ProcessUtils.h"
 #include "../IO/Log.h"
+#include "../IO/MemoryBuffer.h"
 #include "../LuaScript/LuaFile.h"
 #include "../LuaScript/LuaFunction.h"
 #include "../LuaScript/LuaScript.h"
 #include "../LuaScript/LuaScriptEventInvoker.h"
 #include "../LuaScript/LuaScriptInstance.h"
-#include "../IO/MemoryBuffer.h"
-#ifdef URHO3D_PHYSICS
+#if defined(URHO3D_PHYSICS) || defined(URHO3D_URHO2D)
 #include "../Physics/PhysicsEvents.h"
-#include "../Physics/PhysicsWorld.h"
 #endif
 #include "../Resource/ResourceCache.h"
 #include "../Scene/Scene.h"
 #include "../Scene/SceneEvents.h"
-#include "../Core/ProcessUtils.h"
-#include "../IO/VectorBuffer.h"
 
 #include <toluapp/tolua++.h>
 #include "../LuaScript/ToluaUtils.h"
@@ -50,6 +50,7 @@ namespace Urho3D
 static const char* scriptObjectMethodNames[] = {
     "Start",
     "Stop",
+    "DelayedStart",
     "Update",
     "PostUpdate",
     "FixedUpdate",
@@ -70,7 +71,7 @@ LuaScriptInstance::LuaScriptInstance(Context* context) :
     luaState_ = luaScript_->GetState();
     attributeInfos_ = *context_->GetAttributes(GetTypeStatic());
 
-    eventInvoker_ =  new LuaScriptEventInvoker(this);
+    eventInvoker_ = new LuaScriptEventInvoker(this);
 
     for (int i = 0; i < MAX_LUA_SCRIPT_OBJECT_METHODS; ++i)
         scriptObjectMethods_[i] = 0;
@@ -85,11 +86,14 @@ void LuaScriptInstance::RegisterObject(Context* context)
 {
     context->RegisterFactory<LuaScriptInstance>(LOGIC_CATEGORY);
 
-    ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
-    MIXED_ACCESSOR_ATTRIBUTE("Script File", GetScriptFileAttr, SetScriptFileAttr, ResourceRef, ResourceRef(LuaFile::GetTypeStatic()), AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Script Object Type", GetScriptObjectType, SetScriptObjectType, String, String::EMPTY, AM_DEFAULT);
-    MIXED_ACCESSOR_ATTRIBUTE("Script Data", GetScriptDataAttr, SetScriptDataAttr, PODVector<unsigned char>, Variant::emptyBuffer, AM_FILE | AM_NOEDIT);
-    MIXED_ACCESSOR_ATTRIBUTE("Script Network Data", GetScriptNetworkDataAttr, SetScriptNetworkDataAttr, PODVector<unsigned char>, Variant::emptyBuffer, AM_NET | AM_NOEDIT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Script File", GetScriptFileAttr, SetScriptFileAttr, ResourceRef,
+        ResourceRef(LuaFile::GetTypeStatic()), AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Script Object Type", GetScriptObjectType, SetScriptObjectType, String, String::EMPTY, AM_DEFAULT);
+    URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Script Data", GetScriptDataAttr, SetScriptDataAttr, PODVector<unsigned char>, Variant::emptyBuffer,
+        AM_FILE | AM_NOEDIT);
+    URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Script Network Data", GetScriptNetworkDataAttr, SetScriptNetworkDataAttr, PODVector<unsigned char>,
+        Variant::emptyBuffer, AM_NET | AM_NOEDIT);
 }
 
 void LuaScriptInstance::OnSetAttribute(const AttributeInfo& attr, const Variant& src)
@@ -131,8 +135,8 @@ void LuaScriptInstance::OnSetAttribute(const AttributeInfo& attr, const Variant&
         case VAR_BOOL:
             lua_pushboolean(luaState_, src.GetBool());
             break;
-        case VAR_FLOAT:
-            lua_pushnumber(luaState_, src.GetFloat());
+        case VAR_DOUBLE:
+            lua_pushnumber(luaState_, src.GetDouble());
             break;
         case VAR_STRING:
             tolua_pushurho3dstring(luaState_, src.GetString());
@@ -164,7 +168,6 @@ void LuaScriptInstance::OnSetAttribute(const AttributeInfo& attr, const Variant&
                 tolua_pushusertype(luaState_, value, "Quaternion");
                 tolua_register_gc(luaState_, lua_gettop(luaState_));
             }
-
             break;
         case VAR_COLOR:
             {
@@ -188,7 +191,7 @@ void LuaScriptInstance::OnSetAttribute(const AttributeInfo& attr, const Variant&
             }
             break;
         default:
-            LOGERROR("Unsupported data type");
+            URHO3D_LOGERROR("Unsupported data type");
             lua_settop(luaState_, top);
             return;
         }
@@ -237,8 +240,8 @@ void LuaScriptInstance::OnGetAttribute(const AttributeInfo& attr, Variant& dest)
     case VAR_BOOL:
         dest = lua_toboolean(luaState_, -1) != 0;
         break;
-    case VAR_FLOAT:
-        dest = (float)lua_tonumber(luaState_, -1);
+    case VAR_DOUBLE:
+        dest = lua_tonumber(luaState_, -1);
         break;
     case VAR_STRING:
         dest = tolua_tourho3dstring(luaState_, -1, "");
@@ -265,7 +268,7 @@ void LuaScriptInstance::OnGetAttribute(const AttributeInfo& attr, Variant& dest)
         dest = *((IntVector2*)tolua_tousertype(luaState_, -1, 0));
         break;
     default:
-        LOGERROR("Unsupported data type");
+        URHO3D_LOGERROR("Unsupported data type");
         return;
     }
 
@@ -276,9 +279,7 @@ void LuaScriptInstance::ApplyAttributes()
 {
     LuaFunction* function = scriptObjectMethods_[LSOM_APPLYATTRIBUTES];
     if (function && function->BeginCall(this))
-    {
         function->EndCall();
-    }
 }
 
 void LuaScriptInstance::OnSetEnabled()
@@ -360,6 +361,16 @@ void LuaScriptInstance::RemoveEventHandlersExcept(const Vector<String>& exceptio
     eventInvoker_->UnsubscribeFromAllEventsExcept(exceptionTypes, true);
 }
 
+bool LuaScriptInstance::HasEventHandler(const String& eventName) const
+{
+    return eventInvoker_->HasSubscribedToEvent(eventName);
+}
+
+bool LuaScriptInstance::HasEventHandler(Object* sender, const String& eventName) const
+{
+    return eventInvoker_->HasSubscribedToEvent(sender, eventName);
+}
+
 bool LuaScriptInstance::CreateObject(const String& scriptObjectType)
 {
     SetScriptFile(0);
@@ -385,7 +396,7 @@ void LuaScriptInstance::SetScriptFile(LuaFile* scriptFile)
         return;
 
     if (!scriptFile_->LoadAndExecute(luaState_))
-        LOGERROR("Execute Lua file failed: " + scriptFile_->GetName());
+        URHO3D_LOGERROR("Execute Lua file failed: " + scriptFile_->GetName());
 }
 
 void LuaScriptInstance::SetScriptObjectType(const String& scriptObjectType)
@@ -481,6 +492,14 @@ PODVector<unsigned char> LuaScriptInstance::GetScriptNetworkDataAttr() const
     return buf.GetBuffer();
 }
 
+void LuaScriptInstance::OnSceneSet(Scene* scene)
+{
+    if (scene)
+        SubscribeToScriptMethodEvents();
+    else
+        UnsubscribeFromScriptMethodEvents();
+}
+
 void LuaScriptInstance::OnMarkedDirty(Node* node)
 {
     // Script functions are not safe from worker threads
@@ -493,9 +512,7 @@ void LuaScriptInstance::OnMarkedDirty(Node* node)
 
     LuaFunction* function = scriptObjectMethods_[LSOM_TRANSFORMCHANGED];
     if (function && function->BeginCall(this))
-    {
         function->EndCall();
-    }
 }
 
 void LuaScriptInstance::GetScriptAttributes()
@@ -504,10 +521,10 @@ void LuaScriptInstance::GetScriptAttributes()
     Vector<String> names;
     if (lua_istable(luaState_, -1))
     {
-        int length = lua_objlen(luaState_, -1);
-        for (int i = 1; i <= length; ++i)
+        size_t length = lua_objlen(luaState_, -1);
+        for (size_t i = 1; i <= length; ++i)
         {
-            lua_pushinteger(luaState_, i);
+            lua_pushinteger(luaState_, (int)i);
             lua_gettable(luaState_, -2);
 
             if (!lua_isstring(luaState_, -1))
@@ -545,7 +562,7 @@ void LuaScriptInstance::GetScriptAttributes()
             info.type_ = VAR_BOOL;
             break;
         case LUA_TNUMBER:
-            info.type_ = VAR_FLOAT;
+            info.type_ = VAR_DOUBLE;
             break;
         case LUA_TSTRING:
             info.type_ = VAR_STRING;
@@ -594,20 +611,20 @@ void LuaScriptInstance::SubscribeToScriptMethodEvents()
 {
     Scene* scene = GetScene();
 
-    if (scene && scriptObjectMethods_[LSOM_UPDATE])
-        SubscribeToEvent(scene, E_SCENEUPDATE, HANDLER(LuaScriptInstance, HandleUpdate));
+    if (scene && (scriptObjectMethods_[LSOM_UPDATE] || scriptObjectMethods_[LSOM_DELAYEDSTART]))
+        SubscribeToEvent(scene, E_SCENEUPDATE, URHO3D_HANDLER(LuaScriptInstance, HandleUpdate));
 
     if (scene && scriptObjectMethods_[LSOM_POSTUPDATE])
-        SubscribeToEvent(scene, E_SCENEPOSTUPDATE, HANDLER(LuaScriptInstance, HandlePostUpdate));
+        SubscribeToEvent(scene, E_SCENEPOSTUPDATE, URHO3D_HANDLER(LuaScriptInstance, HandlePostUpdate));
 
-#ifdef URHO3D_PHYSICS
-    PhysicsWorld* physicsWorld = scene ? scene->GetComponent<PhysicsWorld>() : 0;
+#if defined(URHO3D_PHYSICS) || defined(URHO3D_URHO2D)
+    Component* world = GetFixedUpdateSource();
 
-    if (physicsWorld && scriptObjectMethods_[LSOM_FIXEDUPDATE])
-        SubscribeToEvent(physicsWorld, E_PHYSICSPRESTEP, HANDLER(LuaScriptInstance, HandleFixedUpdate));
+    if (world && scriptObjectMethods_[LSOM_FIXEDUPDATE])
+        SubscribeToEvent(world, E_PHYSICSPRESTEP, URHO3D_HANDLER(LuaScriptInstance, HandleFixedUpdate));
 
-    if (physicsWorld && scriptObjectMethods_[LSOM_FIXEDPOSTUPDATE])
-        SubscribeToEvent(physicsWorld, E_PHYSICSPOSTSTEP, HANDLER(LuaScriptInstance, HandlePostFixedUpdate));
+    if (world && scriptObjectMethods_[LSOM_FIXEDPOSTUPDATE])
+        SubscribeToEvent(world, E_PHYSICSPOSTSTEP, URHO3D_HANDLER(LuaScriptInstance, HandlePostFixedUpdate));
 #endif
 
     if (node_ && scriptObjectMethods_[LSOM_TRANSFORMCHANGED])
@@ -616,21 +633,12 @@ void LuaScriptInstance::SubscribeToScriptMethodEvents()
 
 void LuaScriptInstance::UnsubscribeFromScriptMethodEvents()
 {
-    Scene* scene = GetScene();
-    if (scene && scriptObjectMethods_[LSOM_UPDATE])
-        UnsubscribeFromEvent(scene, E_SCENEUPDATE);
+    UnsubscribeFromEvent(E_SCENEUPDATE);
+    UnsubscribeFromEvent(E_SCENEPOSTUPDATE);
 
-    if (scene && scriptObjectMethods_[LSOM_POSTUPDATE])
-        UnsubscribeFromEvent(scene, E_SCENEPOSTUPDATE);
-
-#ifdef URHO3D_PHYSICS
-    PhysicsWorld* physicsWorld = scene ? scene->GetComponent<PhysicsWorld>() : 0;
-
-    if (physicsWorld && scriptObjectMethods_[LSOM_FIXEDUPDATE])
-        UnsubscribeFromEvent(physicsWorld, E_PHYSICSPRESTEP);
-
-    if (physicsWorld && scriptObjectMethods_[LSOM_FIXEDPOSTUPDATE])
-        UnsubscribeFromEvent(physicsWorld, E_PHYSICSPOSTSTEP);
+#if defined(URHO3D_PHYSICS) || defined(URHO3D_URHO2D)
+    UnsubscribeFromEvent(E_PHYSICSPRESTEP);
+    UnsubscribeFromEvent(E_PHYSICSPOSTSTEP);
 #endif
 
     if (node_ && scriptObjectMethods_[LSOM_TRANSFORMCHANGED])
@@ -641,6 +649,14 @@ void LuaScriptInstance::HandleUpdate(StringHash eventType, VariantMap& eventData
 {
     using namespace Update;
     float timeStep = eventData[P_TIMESTEP].GetFloat();
+
+    // Execute delayed start before first update
+    if (scriptObjectMethods_[LSOM_DELAYEDSTART])
+    {
+        if (scriptObjectMethods_[LSOM_DELAYEDSTART]->BeginCall(this))
+            scriptObjectMethods_[LSOM_DELAYEDSTART]->EndCall();
+        scriptObjectMethods_[LSOM_DELAYEDSTART] = 0;  // Only execute once
+    }
 
     LuaFunction* function = scriptObjectMethods_[LSOM_UPDATE];
     if (function && function->BeginCall(this))
@@ -663,9 +679,18 @@ void LuaScriptInstance::HandlePostUpdate(StringHash eventType, VariantMap& event
     }
 }
 
-#ifdef URHO3D_PHYSICS
+#if defined(URHO3D_PHYSICS) || defined(URHO3D_URHO2D)
+
 void LuaScriptInstance::HandleFixedUpdate(StringHash eventType, VariantMap& eventData)
 {
+    // Execute delayed start before first fixed update if not called yet
+    if (scriptObjectMethods_[LSOM_DELAYEDSTART])
+    {
+        if (scriptObjectMethods_[LSOM_DELAYEDSTART]->BeginCall(this))
+            scriptObjectMethods_[LSOM_DELAYEDSTART]->EndCall();
+        scriptObjectMethods_[LSOM_DELAYEDSTART] = 0;  // Only execute once
+    }
+
     using namespace PhysicsPreStep;
     float timeStep = eventData[P_TIMESTEP].GetFloat();
 
@@ -689,6 +714,7 @@ void LuaScriptInstance::HandlePostFixedUpdate(StringHash eventType, VariantMap& 
         function->EndCall();
     }
 }
+
 #endif
 
 void LuaScriptInstance::ReleaseObject()
@@ -711,6 +737,9 @@ void LuaScriptInstance::ReleaseObject()
         function->PushUserType((void*)this, "LuaScriptInstance");
         function->EndCall();
     }
+
+    for (int i = 0; i < MAX_LUA_SCRIPT_OBJECT_METHODS; ++i)
+        scriptObjectMethods_[i] = 0;
 }
 
 LuaFunction* LuaScriptInstance::GetScriptObjectFunction(const String& functionName) const

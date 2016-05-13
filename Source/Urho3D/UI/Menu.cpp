@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+#include "../Precompiled.h"
 
 #include "../Core/Context.h"
 #include "../Input/InputEvents.h"
@@ -48,10 +50,10 @@ Menu::Menu(Context* context) :
 {
     focusMode_ = FM_NOTFOCUSABLE;
 
-    SubscribeToEvent(this, E_PRESSED, HANDLER(Menu, HandlePressedReleased));
-    SubscribeToEvent(this, E_RELEASED, HANDLER(Menu, HandlePressedReleased));
-    SubscribeToEvent(E_UIMOUSECLICK, HANDLER(Menu, HandleFocusChanged));
-    SubscribeToEvent(E_FOCUSCHANGED, HANDLER(Menu, HandleFocusChanged));
+    SubscribeToEvent(this, E_PRESSED, URHO3D_HANDLER(Menu, HandlePressedReleased));
+    SubscribeToEvent(this, E_RELEASED, URHO3D_HANDLER(Menu, HandlePressedReleased));
+    SubscribeToEvent(E_UIMOUSECLICK, URHO3D_HANDLER(Menu, HandleFocusChanged));
+    SubscribeToEvent(E_FOCUSCHANGED, URHO3D_HANDLER(Menu, HandleFocusChanged));
 }
 
 Menu::~Menu()
@@ -64,15 +66,15 @@ void Menu::RegisterObject(Context* context)
 {
     context->RegisterFactory<Menu>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(Button);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Focus Mode", FM_NOTFOCUSABLE);
-    ACCESSOR_ATTRIBUTE("Popup Offset", GetPopupOffset, SetPopupOffset, IntVector2, IntVector2::ZERO, AM_FILE);
+    URHO3D_COPY_BASE_ATTRIBUTES(Button);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Focus Mode", FM_NOTFOCUSABLE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Popup Offset", GetPopupOffset, SetPopupOffset, IntVector2, IntVector2::ZERO, AM_FILE);
 }
 
 void Menu::Update(float timeStep)
 {
     Button::Update(timeStep);
-    
+
     if (popup_ && showPopup_)
     {
         const Vector<SharedPtr<UIElement> >& children = popup_->GetChildren();
@@ -177,7 +179,7 @@ bool Menu::LoadXML(const XMLElement& source, XMLFile* styleFile, bool setInstanc
                 // Do not add the popup element as a child even temporarily, as that can break layouts
                 SharedPtr<UIElement> popup = DynamicCast<UIElement>(context_->CreateObject(typeName));
                 if (!popup)
-                    LOGERROR("Could not create popup element type " + typeName);
+                    URHO3D_LOGERROR("Could not create popup element type " + typeName);
                 else
                 {
                     child = popup;
@@ -203,7 +205,7 @@ bool Menu::LoadXML(const XMLElement& source, XMLFile* styleFile, bool setInstanc
                 }
 
                 if (!child)
-                    LOGWARNING("Could not find matching internal child element of type " + typeName + " in " + GetTypeName());
+                    URHO3D_LOGWARNING("Could not find matching internal child element of type " + typeName + " in " + GetTypeName());
             }
         }
 
@@ -245,7 +247,7 @@ bool Menu::SaveXML(XMLElement& dest) const
         // Filter popup implicit attributes
         if (!FilterPopupImplicitAttributes(childElem))
         {
-            LOGERROR("Could not remove popup implicit attributes");
+            URHO3D_LOGERROR("Could not remove popup implicit attributes");
             return false;
         }
     }
@@ -261,7 +263,7 @@ void Menu::SetPopup(UIElement* popup)
     // Currently only allow popup 'window'
     if (popup->GetType() != Window::GetTypeStatic())
     {
-        LOGERROR("Could not set popup element of type " + popup->GetTypeName() + ", only support popup window for now");
+        URHO3D_LOGERROR("Could not set popup element of type " + popup->GetTypeName() + ", only support popup window for now");
         return;
     }
 
@@ -335,7 +337,7 @@ void Menu::SetAccelerator(int key, int qualifiers)
     acceleratorQualifiers_ = qualifiers;
 
     if (key)
-        SubscribeToEvent(E_KEYDOWN, HANDLER(Menu, HandleKeyDown));
+        SubscribeToEvent(E_KEYDOWN, URHO3D_HANDLER(Menu, HandleKeyDown));
     else
         UnsubscribeFromEvent(E_KEYDOWN);
 }
@@ -424,8 +426,9 @@ void Menu::HandleKeyDown(StringHash eventType, VariantMap& eventData)
     using namespace KeyDown;
 
     // Activate if accelerator key pressed
-    if (eventData[P_KEY].GetInt() == acceleratorKey_ && (acceleratorQualifiers_ == QUAL_ANY || eventData[P_QUALIFIERS].GetInt() ==
-        acceleratorQualifiers_) && eventData[P_REPEAT].GetBool() == false)
+    if (eventData[P_KEY].GetInt() == acceleratorKey_ &&
+        (acceleratorQualifiers_ == QUAL_ANY || eventData[P_QUALIFIERS].GetInt() == acceleratorQualifiers_) &&
+        eventData[P_REPEAT].GetBool() == false)
     {
         // Ignore if UI has modal element
         if (GetSubsystem<UI>()->HasModalElement())

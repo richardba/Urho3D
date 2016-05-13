@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,9 +23,9 @@
 #pragma once
 
 #include "../Graphics/Drawable.h"
+#include "../Graphics/VertexBuffer.h"
 #include "../Math/Matrix3x4.h"
 #include "../UI/Text.h"
-#include "../Graphics/VertexBuffer.h"
 
 namespace Urho3D
 {
@@ -35,7 +35,7 @@ class Text;
 /// 3D text component.
 class URHO3D_API Text3D : public Drawable
 {
-    OBJECT(Text3D);
+    URHO3D_OBJECT(Text3D, Drawable);
 
 public:
     /// Construct.
@@ -133,6 +133,7 @@ public:
     const Color& GetColor(Corner corner) const;
     /// Return opacity.
     float GetOpacity() const;
+
     /// Return how the text rotates in relation to the camera.
     FaceCameraMode GetFaceCameraMode() const { return faceCameraMode_; }
 
@@ -144,6 +145,7 @@ public:
     void SetMaterialAttr(const ResourceRef& value);
     /// Return material attribute.
     ResourceRef GetMaterialAttr() const;
+
     /// Get color attribute. Uses just the top-left color.
     const Color& GetColorAttr() const { return text_.color_[0]; }
 
@@ -156,8 +158,6 @@ protected:
 private:
     /// Mark text & geometry dirty.
     void MarkTextDirty();
-    /// Update text and font.
-    void UpdateText();
     /// Update text %UI batches.
     void UpdateTextBatches();
     /// Create materials for text rendering. May only be called from the main thread. Text %UI batches must be up-to-date.
@@ -183,6 +183,10 @@ private:
     bool textDirty_;
     /// Geometry dirty flag.
     bool geometryDirty_;
+    /// Flag for whether currently using SDF shader defines in the generated material.
+    bool usingSDFShader_;
+    /// Font texture data lost flag.
+    bool fontDataLost_;
 };
 
 }

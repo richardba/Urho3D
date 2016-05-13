@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,9 @@
 
 #pragma once
 
-#include "../UI/BorderImage.h"
-#include "../Resource/Image.h"
 #include "../Graphics/Texture.h"
+#include "../Resource/Image.h"
+#include "../UI/BorderImage.h"
 
 #include <SDL/SDL_mouse.h>
 
@@ -80,18 +80,18 @@ struct URHO3D_API CursorShapeInfo
     IntRect imageRect_;
     /// Hotspot coordinates.
     IntVector2 hotSpot_;
-    /// System cursor index.
-    int systemCursor_;
     /// OS cursor.
     SDL_Cursor* osCursor_;
     /// Whether the OS cursor is system defined.
     bool systemDefined_;
+    /// System cursor index.
+    int systemCursor_;
 };
 
 /// Mouse cursor %UI element.
 class URHO3D_API Cursor : public BorderImage
 {
-    OBJECT(Cursor);
+    URHO3D_OBJECT(Cursor, BorderImage);
 
 public:
     /// Construct.
@@ -114,8 +114,10 @@ public:
     void SetShape(CursorShape shape);
     /// Set whether to use system default shapes. Is only possible when the OS mouse cursor has been set visible from the Input subsystem.
     void SetUseSystemShapes(bool enable);
+
     /// Get current shape.
     const String& GetShape() const { return shape_; }
+
     /// Return whether is using system default shapes.
     bool GetUseSystemShapes() const { return useSystemShapes_; }
 

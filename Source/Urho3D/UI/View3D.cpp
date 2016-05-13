@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,17 +20,19 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/Octree.h"
-#include "../Scene/Scene.h"
 #include "../Graphics/Texture2D.h"
-#include "../Graphics/Viewport.h"
+#include "../Graphics/Zone.h"
+#include "../Scene/Scene.h"
 #include "../UI/View3D.h"
 #include "../UI/UI.h"
 #include "../UI/UIEvents.h"
-#include "../Graphics/Zone.h"
 
 namespace Urho3D
 {
@@ -46,6 +48,8 @@ View3D::View3D(Context* context) :
     renderTexture_ = new Texture2D(context_);
     depthTexture_ = new Texture2D(context_);
     viewport_ = new Viewport(context_);
+
+    SubscribeToEvent(E_RENDERSURFACEUPDATE, URHO3D_HANDLER(View3D, HandleRenderSurfaceUpdate));
 }
 
 View3D::~View3D()
@@ -57,27 +61,27 @@ void View3D::RegisterObject(Context* context)
 {
     context->RegisterFactory<View3D>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(Window);
+    URHO3D_COPY_BASE_ATTRIBUTES(Window);
     // The texture format is API specific, so do not register it as a serializable attribute
-    ACCESSOR_ATTRIBUTE("Auto Update", GetAutoUpdate, SetAutoUpdate, bool, true, AM_FILE);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
+    URHO3D_ACCESSOR_ATTRIBUTE("Auto Update", GetAutoUpdate, SetAutoUpdate, bool, true, AM_FILE);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
 }
 
 void View3D::OnResize()
 {
     int width = GetWidth();
     int height = GetHeight();
-    
+
     if (width > 0 && height > 0)
     {
         renderTexture_->SetSize(width, height, rttFormat_, TEXTURE_RENDERTARGET);
         depthTexture_->SetSize(width, height, Graphics::GetDepthStencilFormat(), TEXTURE_DEPTHSTENCIL);
         RenderSurface* surface = renderTexture_->GetRenderSurface();
         surface->SetViewport(0, viewport_);
-        surface->SetUpdateMode(autoUpdate_ ? SURFACE_UPDATEALWAYS : SURFACE_MANUALUPDATE);
+        surface->SetUpdateMode(SURFACE_MANUALUPDATE);
         surface->SetLinkedDepthStencil(depthTexture_->GetRenderSurface());
-        
+
         SetTexture(renderTexture_);
         SetImageRect(IntRect(0, 0, width, height));
 
@@ -89,7 +93,7 @@ void View3D::OnResize()
 void View3D::SetView(Scene* scene, Camera* camera, bool ownScene)
 {
     ResetScene();
-    
+
     scene_ = scene;
     cameraNode_ = camera ? camera->GetNode() : 0;
     ownScene_ = ownScene;
@@ -110,23 +114,14 @@ void View3D::SetFormat(unsigned format)
 
 void View3D::SetAutoUpdate(bool enable)
 {
-    if (enable != autoUpdate_)
-    {
-        autoUpdate_ = enable;
-        RenderSurface* surface = renderTexture_->GetRenderSurface();
-        if (surface)
-            surface->SetUpdateMode(autoUpdate_ ? SURFACE_UPDATEALWAYS : SURFACE_MANUALUPDATE);
-    }
+    autoUpdate_ = enable;
 }
 
 void View3D::QueueUpdate()
 {
-    if (!autoUpdate_)
-    {
-        RenderSurface* surface = renderTexture_->GetRenderSurface();
-        if (surface)
-            surface->QueueUpdate();
-    }
+    RenderSurface* surface = renderTexture_->GetRenderSurface();
+    if (surface)
+        surface->QueueUpdate();
 }
 
 Scene* View3D::GetScene() const
@@ -168,6 +163,12 @@ void View3D::ResetScene()
     }
     else
         scene_ = 0;
+}
+
+void View3D::HandleRenderSurfaceUpdate(StringHash eventType, VariantMap& eventData)
+{
+    if (autoUpdate_ && IsVisibleEffective())
+        QueueUpdate();
 }
 
 }

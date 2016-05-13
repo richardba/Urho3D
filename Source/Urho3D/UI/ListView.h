@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,7 @@ enum HighlightMode
 /// Scrollable list %UI element.
 class URHO3D_API ListView : public ScrollView
 {
-    OBJECT(ListView);
+    URHO3D_OBJECT(ListView, ScrollView);
 
 public:
     /// Construct.
@@ -112,8 +112,10 @@ public:
     unsigned FindItem(UIElement* item) const;
     /// Return first selected index, or M_MAX_UNSIGNED if none selected.
     unsigned GetSelection() const;
+
     /// Return all selected indices.
     const PODVector<unsigned>& GetSelections() const { return selections_; }
+
     /// Copy selected items to system clipboard. Currently only applicable to Text items.
     void CopySelectedItemsToClipboard() const;
     /// Return first selected item, or null if none selected.
@@ -124,18 +126,25 @@ public:
     bool IsSelected(unsigned index) const;
     /// Return whether an item at index has its children expanded (in hierachy mode only).
     bool IsExpanded(unsigned index) const;
+
     /// Return highlight mode.
     HighlightMode GetHighlightMode() const { return highlightMode_; }
+
     /// Return whether multiselect enabled.
     bool GetMultiselect() const { return multiselect_; }
+
     /// Return whether selection is cleared on defocus.
     bool GetClearSelectionOnDefocus() const { return clearSelectionOnDefocus_; }
+
     /// Return whether reacts to click end instead of click start for item selection.
     bool GetSelectOnClickEnd() const { return selectOnClickEnd_; }
+
     /// Return whether hierarchy mode enabled.
     bool GetHierarchyMode() const { return hierarchyMode_; }
+
     /// Return base indent.
     int GetBaseIndent() const { return baseIndent_; }
+
     /// Ensure full visibility of the item.
     void EnsureItemVisibility(unsigned index);
     /// Ensure full visibility of the item.

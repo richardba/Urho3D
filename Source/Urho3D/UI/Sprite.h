@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@ namespace Urho3D
 /// %UI element which allows sub-pixel positioning and size, as well as rotation. Only other Sprites should be added as child elements.
 class URHO3D_API Sprite : public UIElement
 {
-    OBJECT(Sprite);
+    URHO3D_OBJECT(Sprite, UIElement);
 
 public:
     /// Construct.
@@ -49,6 +49,10 @@ public:
     virtual void GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexData, const IntRect& currentScissor);
     /// React to position change.
     virtual void OnPositionSet();
+    /// Convert screen coordinates to element coordinates.
+    virtual IntVector2 ScreenToElement(const IntVector2& screenPosition);
+    /// Convert element coordinates to screen coordinates.
+    virtual IntVector2 ElementToScreen(const IntVector2& position);
 
     /// Set floating point position.
     void SetPosition(const Vector2& position);
@@ -77,16 +81,22 @@ public:
 
     /// Return floating point position.
     const Vector2& GetPosition() const { return floatPosition_; }
+
     /// Return hotspot.
     const IntVector2& GetHotSpot() const { return hotSpot_; }
+
     /// Return scale.
     const Vector2& GetScale() const { return scale_; }
+
     /// Return rotation angle.
     float GetRotation() const { return rotation_; }
+
     /// Return texture.
     Texture* GetTexture() const { return texture_; }
+
     /// Return image rectangle.
     const IntRect& GetImageRect() const { return imageRect_; }
+
     /// Return blend mode.
     BlendMode GetBlendMode() const { return blendMode_; }
 

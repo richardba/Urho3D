@@ -41,6 +41,9 @@ function Start()
     -- Create the UI content
     CreateInstructions()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE)
+
     -- Subscribe to necessary events
     SubscribeToEvents()
 end
@@ -240,6 +243,8 @@ function HandleUpdate(eventType, eventData)
         end
         -- Limit pitch
         character.controls.pitch = Clamp(character.controls.pitch, -80.0, 80.0)
+        -- Set rotation already here so that it's updated every rendering frame instead of every physics frame
+        characterNode.rotation = Quaternion(character.controls.yaw, Vector3(0.0, 1.0, 0.0))
 
         -- Switch between 1st and 3rd person
         if input:GetKeyPress(KEY_F) then
@@ -265,9 +270,6 @@ function HandleUpdate(eventType, eventData)
             end
         end
     end
-
-    -- Set rotation already here so that it's updated every rendering frame instead of every physics frame
-    characterNode.rotation = Quaternion(character.controls.yaw, Vector3(0.0, 1.0, 0.0))
 end
 
 function HandlePostUpdate(eventType, eventData)
@@ -343,7 +345,7 @@ function Character:Save(serializer)
 end
 
 function Character:HandleNodeCollision(eventType, eventData)
-    local contacts = eventData:GetBuffer("Contacts")
+    local contacts = eventData["Contacts"]:GetBuffer()
 
     while not contacts.eof do
         local contactPosition = contacts:ReadVector3()

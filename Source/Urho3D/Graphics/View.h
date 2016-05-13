@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,13 +22,13 @@
 
 #pragma once
 
-#include "../Graphics/Batch.h"
 #include "../Container/HashSet.h"
-#include "../Graphics/Light.h"
 #include "../Container/List.h"
 #include "../Core/Object.h"
-#include "../Math/Polyhedron.h"
+#include "../Graphics/Batch.h"
+#include "../Graphics/Light.h"
 #include "../Graphics/Zone.h"
+#include "../Math/Polyhedron.h"
 
 namespace Urho3D
 {
@@ -44,6 +44,7 @@ class Renderer;
 class RenderPath;
 class RenderSurface;
 class Technique;
+class Texture;
 class Texture2D;
 class Viewport;
 class Zone;
@@ -65,7 +66,7 @@ struct LightQueryResult
     unsigned shadowCasterBegin_[MAX_LIGHT_SPLITS];
     /// Shadow caster end indices.
     unsigned shadowCasterEnd_[MAX_LIGHT_SPLITS];
-    /// Combined bounding box of shadow casters in light view or projection space.
+    /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
     BoundingBox shadowCasterBox_[MAX_LIGHT_SPLITS];
     /// Shadow camera near splits (directional lights only.)
     float shadowNearSplits_[MAX_LIGHT_SPLITS];
@@ -78,14 +79,12 @@ struct LightQueryResult
 /// Scene render pass info.
 struct ScenePassInfo
 {
-    /// Pass name hash.
-    StringHash pass_;
+    /// Pass index.
+    unsigned passIndex_;
     /// Allow instancing flag.
     bool allowInstancing_;
     /// Mark to stencil flag.
     bool markToStencil_;
-    /// Light scissor optimization flag.
-    bool useScissor_;
     /// Vertex light flag.
     bool vertexLights_;
     /// Batch queue.
@@ -112,58 +111,90 @@ class URHO3D_API View : public Object
 {
     friend void CheckVisibilityWork(const WorkItem* item, unsigned threadIndex);
     friend void ProcessLightWork(const WorkItem* item, unsigned threadIndex);
-    
-    OBJECT(View);
-    
+
+    URHO3D_OBJECT(View, Object);
+
 public:
     /// Construct.
     View(Context* context);
     /// Destruct.
     virtual ~View();
-    
+
     /// Define with rendertarget and viewport. Return true if successful.
     bool Define(RenderSurface* renderTarget, Viewport* viewport);
     /// Update and cull objects and construct rendering batches.
     void Update(const FrameInfo& frame);
     /// Render batches.
     void Render();
-    
+
     /// Return graphics subsystem.
     Graphics* GetGraphics() const;
     /// Return renderer subsystem.
     Renderer* GetRenderer() const;
+
     /// Return scene.
     Scene* GetScene() const { return scene_; }
+
     /// Return octree.
     Octree* GetOctree() const { return octree_; }
-    /// Return camera.
+
+    /// Return viewport camera.
     Camera* GetCamera() const { return camera_; }
+
+    /// Return culling camera. Normally same as the viewport camera.
+    Camera* GetCullCamera() const { return cullCamera_; }
+
     /// Return information of the frame being rendered.
     const FrameInfo& GetFrameInfo() const { return frame_; }
+
     /// Return the rendertarget. 0 if using the backbuffer.
     RenderSurface* GetRenderTarget() const { return renderTarget_; }
+
     /// Return whether should draw debug geometry.
     bool GetDrawDebug() const { return drawDebug_; }
+
     /// Return geometry objects.
     const PODVector<Drawable*>& GetGeometries() const { return geometries_; }
+
     /// Return occluder objects.
     const PODVector<Drawable*>& GetOccluders() const { return occluders_; }
+
     /// Return lights.
     const PODVector<Light*>& GetLights() const { return lights_; }
+
     /// Return light batch queues.
     const Vector<LightBatchQueue>& GetLightQueues() const { return lightQueues_; }
+
+    /// Return the last used software occlusion buffer.
+    OcclusionBuffer* GetOcclusionBuffer() const { return occlusionBuffer_; }
+
+    /// Return number of occluders that were actually rendered. Occluders may be rejected if running out of triangles or if behind other occluders.
+    unsigned GetNumActiveOccluders() const { return activeOccluders_; }
+
+    /// Return the source view that was already prepared. Used when viewports specify the same culling camera.
+    View* GetSourceView() const;
+
     /// Set global (per-frame) shader parameters. Called by Batch and internally by View.
     void SetGlobalShaderParameters();
     /// Set camera-specific shader parameters. Called by Batch and internally by View.
     void SetCameraShaderParameters(Camera* camera, bool setProjectionMatrix);
     /// Set G-buffer offset and inverse size shader parameters. Called by Batch and internally by View.
     void SetGBufferShaderParameters(const IntVector2& texSize, const IntRect& viewRect);
-    
+
+    /// Draw a fullscreen quad. Shaders and renderstates must have been set beforehand.
+    void DrawFullscreenQuad(bool nearQuad);
+
 private:
     /// Query the octree for drawable objects.
     void GetDrawables();
     /// Construct batches from the drawable objects.
     void GetBatches();
+    /// Get lit geometries and shadowcasters for visible lights.
+    void ProcessLights();
+    /// Get batches from lit geometries and shadowcasters.
+    void GetLightBatches();
+    /// Get unlit batches.
+    void GetBaseBatches();
     /// Update geometries and sort batches.
     void UpdateGeometries();
     /// Get pixel lit batches for a certain light and drawable.
@@ -187,9 +218,7 @@ private:
     /// Allocate needed screen buffers.
     void AllocateScreenBuffers();
     /// Blit the viewport from one surface to another.
-    void BlitFramebuffer(Texture2D* source, RenderSurface* destination, bool depthWrite);
-    /// Draw a fullscreen quad. Shaders and renderstates must have been set beforehand.
-    void DrawFullscreenQuad(bool nearQuad);
+    void BlitFramebuffer(Texture* source, RenderSurface* destination, bool depthWrite);
     /// Query for occluders as seen from a camera.
     void UpdateOccluders(PODVector<Drawable*>& occluders, Camera* camera);
     /// Draw occluders to occlusion buffer.
@@ -203,11 +232,14 @@ private:
     /// Set up a directional light shadow camera
     void SetupDirLightShadowCamera(Camera* shadowCamera, Light* light, float nearSplit, float farSplit);
     /// Finalize shadow camera view after shadow casters and the shadow map are known.
-    void FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& shadowCasterBox);
+    void
+        FinalizeShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& shadowCasterBox);
     /// Quantize a directional light shadow camera view to eliminate swimming.
-    void QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& viewBox);
+    void
+        QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport, const BoundingBox& viewBox);
     /// Check visibility of one shadow caster.
-    bool IsShadowCasterVisible(Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView, const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
+    bool IsShadowCasterVisible(Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
+        const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
     /// Return the viewport for a shadow map split.
     IntRect GetShadowMapViewport(Light* light, unsigned splitIndex, Texture2D* shadowMap);
     /// Find and set a new zone for a drawable when it has moved.
@@ -226,7 +258,11 @@ private:
     void RenderShadowMap(const LightBatchQueue& queue);
     /// Return the proper depth-stencil surface to use for a rendertarget.
     RenderSurface* GetDepthStencil(RenderSurface* renderTarget);
-    
+    /// Helper function to get the render surface from a texture. 2D textures will always return the first face only.
+    RenderSurface* GetRenderSurfaceFromTexture(Texture* texture, CubeMapFace face = FACE_POSITIVE_X);
+    /// Get a named texture from the rendertarget list or from the resource cache, to be either used as a rendertarget or texture binding.
+    Texture* FindNamedTexture(const String& name, bool isRenderTarget, bool isVolumeMap = false);
+
     /// Return the drawable's zone, or camera zone if it has override mode enabled.
     Zone* GetZone(Drawable* drawable)
     {
@@ -265,10 +301,12 @@ private:
     Scene* scene_;
     /// Octree to use.
     Octree* octree_;
-    /// Camera to use.
+    /// Viewport (rendering) camera.
     Camera* camera_;
-    /// Camera's scene node.
-    Node* cameraNode_;
+    /// Culling camera. Usually same as the viewport camera.
+    Camera* cullCamera_;
+    /// Shared source view. Null if this view is using its own culling.
+    WeakPtr<View> sourceView_;
     /// Zone the camera is inside, or default zone if not assigned.
     Zone* cameraZone_;
     /// Zone at far clip plane.
@@ -280,13 +318,13 @@ private:
     /// Substitute rendertarget for deferred rendering. Allocated if necessary.
     RenderSurface* substituteRenderTarget_;
     /// Texture(s) for sampling the viewport contents. Allocated if necessary.
-    Texture2D* viewportTextures_[MAX_VIEWPORT_TEXTURES];
+    Texture* viewportTextures_[MAX_VIEWPORT_TEXTURES];
     /// Color rendertarget active for the current renderpath command.
     RenderSurface* currentRenderTarget_;
     /// Texture containing the latest viewport texture.
-    Texture2D* currentViewportTexture_;
+    Texture* currentViewportTexture_;
     /// Dummy texture for D3D9 depth only rendering.
-    Texture2D* depthOnlyDummyTexture_;
+    Texture* depthOnlyDummyTexture_;
     /// Viewport rectangle.
     IntRect viewRect_;
     /// Viewport size.
@@ -295,6 +333,8 @@ private:
     IntVector2 rtSize_;
     /// Information of the frame being rendered.
     FrameInfo frame_;
+    /// View aspect ratio.
+    float aspectRatio_;
     /// Minimum Z value of the visible scene.
     float minZ_;
     /// Maximum Z value of the visible scene.
@@ -307,6 +347,8 @@ private:
     int minInstances_;
     /// Highest zone priority currently visible.
     int highestZonePriority_;
+    /// Geometries updated flag.
+    bool geometriesUpdated_;
     /// Camera zone's override flag.
     bool cameraZoneOverride_;
     /// Draw shadows flag.
@@ -341,34 +383,39 @@ private:
     PODVector<Drawable*> occluders_;
     /// Lights.
     PODVector<Light*> lights_;
+    /// Number of active occluders.
+    unsigned activeOccluders_;
+
     /// Drawables that limit their maximum light count.
     HashSet<Drawable*> maxLightsDrawables_;
     /// Rendertargets defined by the renderpath.
-    HashMap<StringHash, Texture2D*> renderTargets_;
+    HashMap<StringHash, Texture*> renderTargets_;
     /// Intermediate light processing results.
     Vector<LightQueryResult> lightQueryResults_;
     /// Info for scene render passes defined by the renderpath.
-    Vector<ScenePassInfo> scenePasses_;
+    PODVector<ScenePassInfo> scenePasses_;
     /// Per-pixel light queues.
     Vector<LightBatchQueue> lightQueues_;
     /// Per-vertex light queues.
     HashMap<unsigned long long, LightBatchQueue> vertexLightQueues_;
-    /// Batch queues.
-    HashMap<StringHash, BatchQueue> batchQueues_;
-    /// Hash of the GBuffer pass, or null if none.
-    StringHash gBufferPassName_;
-    /// Hash of the opaque forward base pass.
-    StringHash basePassName_;
-    /// Hash of the alpha pass.
-    StringHash alphaPassName_;
-    /// Hash of the forward light pass.
-    StringHash lightPassName_;
-    /// Hash of the litbase pass.
-    StringHash litBasePassName_;
-    /// Hash of the litalpha pass.
-    StringHash litAlphaPassName_;
+    /// Batch queues by pass index.
+    HashMap<unsigned, BatchQueue> batchQueues_;
+    /// Index of the GBuffer pass.
+    unsigned gBufferPassIndex_;
+    /// Index of the opaque forward base pass.
+    unsigned basePassIndex_;
+    /// Index of the alpha pass.
+    unsigned alphaPassIndex_;
+    /// Index of the forward light pass.
+    unsigned lightPassIndex_;
+    /// Index of the litbase pass.
+    unsigned litBasePassIndex_;
+    /// Index of the litalpha pass.
+    unsigned litAlphaPassIndex_;
     /// Pointer to the light volume command if any.
     const RenderPathCommand* lightVolumeCommand_;
+    /// Flag for scene being resolved from the backbuffer.
+    bool usedResolve_;
 };
 
 }

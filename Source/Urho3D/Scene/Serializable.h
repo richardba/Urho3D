@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ class Connection;
 class Deserializer;
 class Serializer;
 class XMLElement;
+class JSONValue;
 
 struct DirtyBits;
 struct NetworkState;
@@ -42,7 +43,7 @@ struct ReplicationState;
 /// Base class for objects with automatic serialization through attributes.
 class URHO3D_API Serializable : public Object
 {
-    OBJECT(Serializable);
+    URHO3D_OBJECT(Serializable, Object);
 
 public:
     /// Construct.
@@ -66,12 +67,19 @@ public:
     virtual bool LoadXML(const XMLElement& source, bool setInstanceDefault = false);
     /// Save as XML data. Return true if successful.
     virtual bool SaveXML(XMLElement& dest) const;
+    /// Load from JSON data. When setInstanceDefault is set to true, after setting the attribute value, store the value as instance's default value. Return true if successful.
+    virtual bool LoadJSON(const JSONValue& source, bool setInstanceDefault = false);
+    /// Save as JSON data. Return true if successful.
+    virtual bool SaveJSON(JSONValue& dest) const;
+
     /// Apply attribute changes that can not be applied immediately. Called after scene load or a network update.
-    virtual void ApplyAttributes() {}
+    virtual void ApplyAttributes() { }
+
     /// Return whether should save default-valued attributes into XML. Default false.
     virtual bool SaveDefaultAttributes() const { return false; }
+
     /// Mark for attribute check on the next network update.
-    virtual void MarkNetworkUpdate() {}
+    virtual void MarkNetworkUpdate() { }
 
     /// Set attribute by index. Return true if successfully set.
     bool SetAttribute(unsigned index, const Variant& value);
@@ -83,18 +91,20 @@ public:
     void RemoveInstanceDefault();
     /// Set temporary flag. Temporary objects will not be saved.
     void SetTemporary(bool enable);
+    /// Enable interception of an attribute from network updates. Intercepted attributes are sent as events instead of applying directly. This can be used to implement client side prediction.
+    void SetInterceptNetworkUpdate(const String& attributeName, bool enable);
     /// Allocate network attribute state.
     void AllocateNetworkState();
     /// Write initial delta network update.
-    void WriteInitialDeltaUpdate(Serializer& dest);
+    void WriteInitialDeltaUpdate(Serializer& dest, unsigned char timeStamp);
     /// Write a delta network update according to dirty attribute bits.
-    void WriteDeltaUpdate(Serializer& dest, const DirtyBits& attributeBits);
+    void WriteDeltaUpdate(Serializer& dest, const DirtyBits& attributeBits, unsigned char timeStamp);
     /// Write a latest data network update.
-    void WriteLatestDataUpdate(Serializer& dest);
-    /// Read and apply a network delta update.
-    void ReadDeltaUpdate(Deserializer& source);
-    /// Read and apply a network latest data update.
-    void ReadLatestDataUpdate(Deserializer& source);
+    void WriteLatestDataUpdate(Serializer& dest, unsigned char timeStamp);
+    /// Read and apply a network delta update. Return true if attributes were changed.
+    bool ReadDeltaUpdate(Deserializer& source);
+    /// Read and apply a network latest data update. Return true if attributes were changed.
+    bool ReadLatestDataUpdate(Deserializer& source);
 
     /// Return attribute value by index. Return empty if illegal index.
     Variant GetAttribute(unsigned index) const;
@@ -108,8 +118,15 @@ public:
     unsigned GetNumAttributes() const;
     /// Return number of network replication attributes.
     unsigned GetNumNetworkAttributes() const;
+
     /// Return whether is temporary.
     bool IsTemporary() const { return temporary_; }
+
+    /// Return whether an attribute's network updates are being intercepted.
+    bool GetInterceptNetworkUpdate(const String& attributeName) const;
+
+    /// Return the network attribute state, if allocated.
+    NetworkState* GetNetworkState() const { return networkState_; }
 
 protected:
     /// Network attribute state.
@@ -166,7 +183,7 @@ public:
 };
 
 /// Attribute trait (default use const reference for object type).
-template<typename T> struct AttributeTrait
+template <typename T> struct AttributeTrait
 {
     /// Get function return type.
     typedef const T& ReturnType;
@@ -175,35 +192,35 @@ template<typename T> struct AttributeTrait
 };
 
 /// Int attribute trait.
-template<> struct AttributeTrait<int>
+template <> struct AttributeTrait<int>
 {
     typedef int ReturnType;
     typedef int ParameterType;
 };
 
 /// unsigned attribute trait.
-template<> struct AttributeTrait<unsigned>
+template <> struct AttributeTrait<unsigned>
 {
     typedef unsigned ReturnType;
     typedef unsigned ParameterType;
 };
 
 /// Bool attribute trait.
-template<> struct AttributeTrait<bool>
+template <> struct AttributeTrait<bool>
 {
-    typedef bool ReturnType; 
-    typedef bool ParameterType; 
+    typedef bool ReturnType;
+    typedef bool ParameterType;
 };
 
 /// Float attribute trait.
-template<> struct AttributeTrait<float>
+template <> struct AttributeTrait<float>
 {
     typedef float ReturnType;
     typedef float ParameterType;
 };
 
 /// Mixed attribute trait (use const reference for set function only).
-template<typename T> struct MixedAttributeTrait
+template <typename T> struct MixedAttributeTrait
 {
     typedef T ReturnType;
     typedef const T& ParameterType;
@@ -213,8 +230,8 @@ template<typename T> struct MixedAttributeTrait
 template <typename T, typename U, typename Trait> class AttributeAccessorImpl : public AttributeAccessor
 {
 public:
-    typedef typename Trait ::ReturnType (T::*GetFunctionPtr)() const;
-    typedef void (T::*SetFunctionPtr)(typename Trait ::ParameterType);
+    typedef typename Trait::ReturnType (T::*GetFunctionPtr)() const;
+    typedef void (T::*SetFunctionPtr)(typename Trait::ParameterType);
 
     /// Construct with function pointers.
     AttributeAccessorImpl(GetFunctionPtr getFunction, SetFunctionPtr setFunction) :
@@ -238,7 +255,7 @@ public:
     {
         assert(ptr);
         T* classPtr = static_cast<T*>(ptr);
-        (classPtr->*setFunction_)(value.Get<U>());
+        (classPtr->*setFunction_)(value.Get < U > ());
     }
 
     /// Class-specific pointer to getter function.
@@ -251,20 +268,20 @@ public:
 // A variable called "context" needs to exist in the current scope and point to a valid Context object.
 
 /// Copy attributes from a base class.
-#define COPY_BASE_ATTRIBUTES(sourceClassName) context->CopyBaseAttributes<sourceClassName, ClassName>()
+#define URHO3D_COPY_BASE_ATTRIBUTES(sourceClassName) context->CopyBaseAttributes<sourceClassName, ClassName>()
 /// Remove attribute by name.
-#define REMOVE_ATTRIBUTE(name) context->RemoveAttribute<ClassName>(name)
+#define URHO3D_REMOVE_ATTRIBUTE(name) context->RemoveAttribute<ClassName>(name)
 /// Define an attribute that points to a memory offset in the object.
-#define ATTRIBUTE(name, typeName, variable, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(GetVariantType<typeName >(), name, offsetof(ClassName, variable), defaultValue, mode))
+#define URHO3D_ATTRIBUTE(name, typeName, variable, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(GetVariantType<typeName >(), name, offsetof(ClassName, variable), defaultValue, mode))
 /// Define an attribute that points to a memory offset in the object, and uses zero-based enum values, which are mapped to names through an array of C string pointers.
-#define ENUM_ATTRIBUTE(name, variable, enumNames, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(name, offsetof(ClassName, variable), enumNames, defaultValue, mode))
+#define URHO3D_ENUM_ATTRIBUTE(name, variable, enumNames, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(name, offsetof(ClassName, variable), enumNames, defaultValue, mode))
 /// Define an attribute that uses get and set functions.
-#define ACCESSOR_ATTRIBUTE(name, getFunction, setFunction, typeName, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(GetVariantType<typeName >(), name, new Urho3D::AttributeAccessorImpl<ClassName, typeName, AttributeTrait<typeName > >(&ClassName::getFunction, &ClassName::setFunction), defaultValue, mode))
+#define URHO3D_ACCESSOR_ATTRIBUTE(name, getFunction, setFunction, typeName, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(GetVariantType<typeName >(), name, new Urho3D::AttributeAccessorImpl<ClassName, typeName, AttributeTrait<typeName > >(&ClassName::getFunction, &ClassName::setFunction), defaultValue, mode))
 /// Define an attribute that uses get and set functions, and uses zero-based enum values, which are mapped to names through an array of C string pointers.
-#define ENUM_ACCESSOR_ATTRIBUTE(name, getFunction, setFunction, typeName, enumNames, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(name, new Urho3D::EnumAttributeAccessorImpl<ClassName, typeName >(&ClassName::getFunction, &ClassName::setFunction), enumNames, defaultValue, mode))
+#define URHO3D_ENUM_ACCESSOR_ATTRIBUTE(name, getFunction, setFunction, typeName, enumNames, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(name, new Urho3D::EnumAttributeAccessorImpl<ClassName, typeName >(&ClassName::getFunction, &ClassName::setFunction), enumNames, defaultValue, mode))
 /// Define an attribute that uses get and set functions, where the get function returns by value, but the set function uses a reference.
-#define MIXED_ACCESSOR_ATTRIBUTE(name, getFunction, setFunction, typeName, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(GetVariantType<typeName >(), name, new Urho3D::AttributeAccessorImpl<ClassName, typeName, MixedAttributeTrait<typeName > >(&ClassName::getFunction, &ClassName::setFunction), defaultValue, mode))
+#define URHO3D_MIXED_ACCESSOR_ATTRIBUTE(name, getFunction, setFunction, typeName, defaultValue, mode) context->RegisterAttribute<ClassName>(Urho3D::AttributeInfo(GetVariantType<typeName >(), name, new Urho3D::AttributeAccessorImpl<ClassName, typeName, MixedAttributeTrait<typeName > >(&ClassName::getFunction, &ClassName::setFunction), defaultValue, mode))
 /// Update the default value of an already registered attribute.
-#define UPDATE_ATTRIBUTE_DEFAULT_VALUE(name, defaultValue) context->UpdateAttributeDefaultValue<ClassName>(name, defaultValue)
+#define URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE(name, defaultValue) context->UpdateAttributeDefaultValue<ClassName>(name, defaultValue)
 
 }

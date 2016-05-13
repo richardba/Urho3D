@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,12 +20,14 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
-#include "../UI/Font.h"
-#include "../UI/FontFace.h"
-#include "../Resource/Image.h"
 #include "../IO/Log.h"
 #include "../Graphics/Texture2D.h"
+#include "../Resource/Image.h"
+#include "../UI/Font.h"
+#include "../UI/FontFace.h"
 
 #include "../DebugNew.h"
 
@@ -115,7 +117,7 @@ SharedPtr<Texture2D> FontFace::LoadFaceTexture(SharedPtr<Image> image)
     SharedPtr<Texture2D> texture = CreateFaceTexture();
     if (!texture->SetData(image, true))
     {
-        LOGERROR("Could not load texture from image resource");
+        URHO3D_LOGERROR("Could not load texture from image resource");
         return SharedPtr<Texture2D>();
     }
     return texture;

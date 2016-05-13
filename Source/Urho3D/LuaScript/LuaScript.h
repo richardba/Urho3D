@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,7 @@ class Scene;
 /// Lua script subsystem.
 class URHO3D_API LuaScript : public Object, public LuaScriptEventListener
 {
-    OBJECT(LuaScript);
+    URHO3D_OBJECT(LuaScript, Object);
 
 public:
     /// Construct.
@@ -48,12 +48,12 @@ public:
     /// Destruct.
     ~LuaScript();
 
-    /// Add a scripted event handler by function.
-    virtual void AddEventHandler(const String& eventName, int functionIndex);
+    /// Add a scripted event handler by function at the given stack index.
+    virtual void AddEventHandler(const String& eventName, int index);
     /// Add a scripted event handler by function name.
     virtual void AddEventHandler(const String& eventName, const String& functionName);
-    /// Add a scripted event handler by function for a specific sender.
-    virtual void AddEventHandler(Object* sender, const String& eventName, int functionIndex);
+    /// Add a scripted event handler by function at the given stack index for a specific sender.
+    virtual void AddEventHandler(Object* sender, const String& eventName, int index);
     /// Add a scripted event handler by function name for a specific sender.
     virtual void AddEventHandler(Object* sender, const String& eventName, const String& functionName);
     /// Remove a scripted event handler.
@@ -66,26 +66,37 @@ public:
     virtual void RemoveAllEventHandlers();
     /// Remove all scripted event handlers, except those listed.
     virtual void RemoveEventHandlersExcept(const Vector<String>& exceptionNames);
+    /// Return whether has subscribed to an event.
+    virtual bool HasEventHandler(const String& eventName) const;
+    /// Return whether has subscribed to a specific sender's event.
+    virtual bool HasEventHandler(Object* sender, const String& eventName) const;
 
     /// Execute script file. Return true if successful.
     bool ExecuteFile(const String& fileName);
     /// Execute script string. Return true if successful.
     bool ExecuteString(const String& string);
+    /// Load script file on file system (i.e. not from resource cache). Return true if successful.
+    bool LoadRawFile(const String& fileName);
+    /// Load and execute script file on file system (i.e. not from resource cache). Return true if successful.
+    bool ExecuteRawFile(const String& fileName);
     /// Execute script function.
     bool ExecuteFunction(const String& functionName);
-    /// Send event.
-    void SendEvent(const String& eventName, VariantMap& eventData);
     /// Set whether to execute engine console commands as script code.
     void SetExecuteConsoleCommands(bool enable);
 
     /// Return Lua state.
     lua_State* GetState() const { return luaState_; }
-    /// Return Lua function by function stack index.
-    LuaFunction* GetFunction(int functionIndex);
+
+    /// Return Lua function at the given stack index.
+    LuaFunction* GetFunction(int index);
     /// Return Lua function by function name.
-    LuaFunction* GetFunction(const String& functionName, bool silentIfNotfound = false);
+    LuaFunction* GetFunction(const String& functionName, bool silentIfNotFound = false);
+
     /// Return whether is executing engine console commands as script code.
     bool GetExecuteConsoleCommands() const { return executeConsoleCommands_; }
+
+    /// Push Lua function to stack. Return true if is successful. Return false on any error and an error string is pushed instead.
+    static bool PushLuaFunction(lua_State* L, const String& functionName);
 
 private:
     /// Register loader.
@@ -96,8 +107,6 @@ private:
     void HandlePostUpdate(StringHash eventType, VariantMap& eventData);
     /// Handle a console command event.
     void HandleConsoleCommand(StringHash eventType, VariantMap& eventData);
-    /// Push script function.
-    bool PushScriptFunction(const String& functionName, bool silentIfNotfound = false);
 
     /// At panic.
     static int AtPanic(lua_State* L);
@@ -108,7 +117,7 @@ private:
 
     /// Lua state.
     lua_State* luaState_;
-    /// Event invoker.
+    /// Procedural event invoker.
     SharedPtr<LuaScriptEventInvoker> eventInvoker_;
     /// Coroutine update function.
     LuaFunction* coroutineUpdate_;

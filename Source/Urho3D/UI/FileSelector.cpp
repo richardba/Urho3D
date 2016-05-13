@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,20 +20,20 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
-#include "../UI/DropDownList.h"
 #include "../IO/File.h"
-#include "../UI/FileSelector.h"
 #include "../IO/FileSystem.h"
 #include "../Input/InputEvents.h"
+#include "../UI/DropDownList.h"
+#include "../UI/FileSelector.h"
 #include "../UI/LineEdit.h"
 #include "../UI/ListView.h"
 #include "../UI/Text.h"
 #include "../UI/UI.h"
 #include "../UI/UIEvents.h"
 #include "../UI/Window.h"
-
-#include "../Container/Sort.h"
 
 #include "../DebugNew.h"
 
@@ -118,16 +118,16 @@ FileSelector::FileSelector(Context* context) :
     ui->SetFocusElement(fileList_);
     window_->SetModal(true);
 
-    SubscribeToEvent(filterList_, E_ITEMSELECTED, HANDLER(FileSelector, HandleFilterChanged));
-    SubscribeToEvent(pathEdit_, E_TEXTFINISHED, HANDLER(FileSelector, HandlePathChanged));
-    SubscribeToEvent(fileNameEdit_, E_TEXTFINISHED, HANDLER(FileSelector, HandleOKPressed));
-    SubscribeToEvent(fileList_, E_ITEMSELECTED, HANDLER(FileSelector, HandleFileSelected));
-    SubscribeToEvent(fileList_, E_ITEMDOUBLECLICKED, HANDLER(FileSelector, HandleFileDoubleClicked));
-    SubscribeToEvent(fileList_, E_UNHANDLEDKEY, HANDLER(FileSelector, HandleFileListKey));
-    SubscribeToEvent(okButton_, E_RELEASED, HANDLER(FileSelector, HandleOKPressed));
-    SubscribeToEvent(cancelButton_, E_RELEASED, HANDLER(FileSelector, HandleCancelPressed));
-    SubscribeToEvent(closeButton_, E_RELEASED, HANDLER(FileSelector, HandleCancelPressed));
-    SubscribeToEvent(window_, E_MODALCHANGED, HANDLER(FileSelector, HandleCancelPressed));
+    SubscribeToEvent(filterList_, E_ITEMSELECTED, URHO3D_HANDLER(FileSelector, HandleFilterChanged));
+    SubscribeToEvent(pathEdit_, E_TEXTFINISHED, URHO3D_HANDLER(FileSelector, HandlePathChanged));
+    SubscribeToEvent(fileNameEdit_, E_TEXTFINISHED, URHO3D_HANDLER(FileSelector, HandleOKPressed));
+    SubscribeToEvent(fileList_, E_ITEMSELECTED, URHO3D_HANDLER(FileSelector, HandleFileSelected));
+    SubscribeToEvent(fileList_, E_ITEMDOUBLECLICKED, URHO3D_HANDLER(FileSelector, HandleFileDoubleClicked));
+    SubscribeToEvent(fileList_, E_UNHANDLEDKEY, URHO3D_HANDLER(FileSelector, HandleFileListKey));
+    SubscribeToEvent(okButton_, E_RELEASED, URHO3D_HANDLER(FileSelector, HandleOKPressed));
+    SubscribeToEvent(cancelButton_, E_RELEASED, URHO3D_HANDLER(FileSelector, HandleCancelPressed));
+    SubscribeToEvent(closeButton_, E_RELEASED, URHO3D_HANDLER(FileSelector, HandleCancelPressed));
+    SubscribeToEvent(window_, E_MODALCHANGED, URHO3D_HANDLER(FileSelector, HandleCancelPressed));
 }
 
 FileSelector::~FileSelector()
@@ -354,7 +354,7 @@ bool FileSelector::EnterFile()
     {
         // If a directory double clicked, enter it. Recognize . and .. as a special case
         const String& newPath = fileEntries_[index].name_;
-        if ((newPath != ".") &&  (newPath != ".."))
+        if ((newPath != ".") && (newPath != ".."))
             SetPath(path_ + newPath);
         else if (newPath == "..")
         {

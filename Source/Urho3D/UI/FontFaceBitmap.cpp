@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,19 +20,19 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
+#include "../Graphics/Graphics.h"
+#include "../Graphics/Texture2D.h"
 #include "../IO/File.h"
 #include "../IO/FileSystem.h"
-#include "../UI/Font.h"
-#include "../UI/FontFaceBitmap.h"
-#include "../Graphics/Graphics.h"
-#include "../Resource/Image.h"
 #include "../IO/Log.h"
 #include "../IO/MemoryBuffer.h"
 #include "../Resource/ResourceCache.h"
-#include "../Graphics/Texture2D.h"
+#include "../UI/Font.h"
+#include "../UI/FontFaceBitmap.h"
 #include "../UI/UI.h"
-#include "../Resource/XMLFile.h"
 
 #include "../DebugNew.h"
 
@@ -56,21 +56,21 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
     MemoryBuffer memoryBuffer(fontData, fontDataSize);
     if (!xmlReader->Load(memoryBuffer))
     {
-        LOGERROR("Could not load XML file");
+        URHO3D_LOGERROR("Could not load XML file");
         return false;
     }
 
     XMLElement root = xmlReader->GetRoot("font");
     if (root.IsNull())
     {
-        LOGERROR("Could not find Font element");
+        URHO3D_LOGERROR("Could not find Font element");
         return false;
     }
 
     XMLElement pagesElem = root.GetChild("pages");
     if (pagesElem.IsNull())
     {
-        LOGERROR("Could not find Pages element");
+        URHO3D_LOGERROR("Could not find Pages element");
         return false;
     }
 
@@ -80,7 +80,7 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
 
     XMLElement commonElem = root.GetChild("common");
     rowHeight_ = commonElem.GetInt("lineHeight");
-    unsigned pages = commonElem.GetInt("pages");
+    unsigned pages = commonElem.GetUInt("pages");
     textures_.Reserve(pages);
 
     ResourceCache* resourceCache = font_->GetSubsystem<ResourceCache>();
@@ -92,7 +92,7 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
     {
         if (pageElem.IsNull())
         {
-            LOGERROR("Could not find Page element for page: " + String(i));
+            URHO3D_LOGERROR("Could not find Page element for page: " + String(i));
             return 0;
         }
 
@@ -104,13 +104,13 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
         SharedPtr<Image> fontImage(new Image(context));
         if (!fontFile || !fontImage->Load(*fontFile))
         {
-            LOGERROR("Failed to load font image file");
+            URHO3D_LOGERROR("Failed to load font image file");
             return 0;
         }
         SharedPtr<Texture2D> texture = LoadFaceTexture(fontImage);
         if (!texture)
             return 0;
-        
+
         textures_.Push(texture);
 
         // Add texture to resource cache
@@ -131,14 +131,14 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
         int id = charElem.GetInt("id");
 
         FontGlyph glyph;
-        glyph.x_ = charElem.GetInt("x");
-        glyph.y_ = charElem.GetInt("y");
-        glyph.width_ = charElem.GetInt("width");
-        glyph.height_ = charElem.GetInt("height");
-        glyph.offsetX_ = charElem.GetInt("xoffset");
-        glyph.offsetY_ = charElem.GetInt("yoffset");
-        glyph.advanceX_ = charElem.GetInt("xadvance");
-        glyph.page_ = charElem.GetInt("page");
+        glyph.x_ = (short)charElem.GetInt("x");
+        glyph.y_ = (short)charElem.GetInt("y");
+        glyph.width_ = (short)charElem.GetInt("width");
+        glyph.height_ = (short)charElem.GetInt("height");
+        glyph.offsetX_ = (short)charElem.GetInt("xoffset");
+        glyph.offsetY_ = (short)charElem.GetInt("yoffset");
+        glyph.advanceX_ = (short)charElem.GetInt("xadvance");
+        glyph.page_ = charElem.GetUInt("page");
 
         glyphMapping_[id] = glyph;
 
@@ -153,14 +153,14 @@ bool FontFaceBitmap::Load(const unsigned char* fontData, unsigned fontDataSize, 
         {
             int first = kerningElem.GetInt("first");
             int second = kerningElem.GetInt("second");
-            unsigned value = (first << 16) + second;
+            unsigned value = (unsigned)((first << 16) + second);
             kerningMapping_[value] = (short)kerningElem.GetInt("amount");
 
             kerningElem = kerningElem.GetNext("kerning");
         }
     }
 
-    LOGDEBUGF("Bitmap font face %s has %d glyphs", GetFileName(font_->GetName()).CString(), count);
+    URHO3D_LOGDEBUGF("Bitmap font face %s has %d glyphs", GetFileName(font_->GetName()).CString(), count);
 
     font_->SetMemoryUse(font_->GetMemoryUse() + totalTextureSize);
     return true;
@@ -185,7 +185,7 @@ bool FontFaceBitmap::Load(FontFace* fontFace, bool usedGlyphs)
     pointSize_ = fontFace->pointSize_;
     rowHeight_ = fontFace->rowHeight_;
 
-    int numPages = 1;
+    unsigned numPages = 1;
     int maxTextureSize = font_->GetSubsystem<UI>()->GetMaxFontTextureSize();
     AreaAllocator allocator(FONT_TEXTURE_MIN_SIZE, FONT_TEXTURE_MIN_SIZE, maxTextureSize, maxTextureSize);
 
@@ -205,8 +205,8 @@ bool FontFaceBitmap::Load(FontFace* fontFace, bool usedGlyphs)
                 return false;
         }
 
-        fontGlyph.x_ = x;
-        fontGlyph.y_ = y;
+        fontGlyph.x_ = (short)x;
+        fontGlyph.y_ = (short)y;
         fontGlyph.page_ = numPages - 1;
 
         glyphMapping_[i->first_] = fontGlyph;
@@ -221,7 +221,7 @@ bool FontFaceBitmap::Load(FontFace* fontFace, bool usedGlyphs)
         oldImages.Push(SaveFaceTexture(fontFace->textures_[i]));
 
     Vector<SharedPtr<Image> > newImages(numPages);
-    for (int i = 0; i < numPages; ++i)
+    for (unsigned i = 0; i < numPages; ++i)
     {
         SharedPtr<Image> image(new Image(font_->GetContext()));
 
@@ -243,7 +243,8 @@ bool FontFaceBitmap::Load(FontFace* fontFace, bool usedGlyphs)
     {
         FontGlyph& newGlyph = i->second_;
         const FontGlyph& oldGlyph = fontFace->glyphMapping_[i->first_];
-        Blit(newImages[newGlyph.page_], newGlyph.x_, newGlyph.y_, newGlyph.width_, newGlyph.height_, oldImages[oldGlyph.page_], oldGlyph.x_, oldGlyph.y_, components);
+        Blit(newImages[newGlyph.page_], newGlyph.x_, newGlyph.y_, newGlyph.width_, newGlyph.height_, oldImages[oldGlyph.page_],
+            oldGlyph.x_, oldGlyph.y_, components);
     }
 
     textures_.Resize(newImages.Size());
@@ -278,7 +279,7 @@ bool FontFaceBitmap::Save(Serializer& dest, int pointSize, const String& indenta
     childElem = rootElem.CreateChild("common");
     childElem.SetInt("lineHeight", rowHeight_);
     unsigned pages = textures_.Size();
-    childElem.SetInt("pages", pages);
+    childElem.SetUInt("pages", pages);
 
     // Construct the path to store the texture
     String pathName;
@@ -322,7 +323,7 @@ bool FontFaceBitmap::Save(Serializer& dest, int pointSize, const String& indenta
         charElem.SetInt("xoffset", glyph.offsetX_);
         charElem.SetInt("yoffset", glyph.offsetY_);
         charElem.SetInt("xadvance", glyph.advanceX_);
-        charElem.SetInt("page", glyph.page_);
+        charElem.SetUInt("page", glyph.page_);
     }
 
     if (!kerningMapping_.Empty())
@@ -356,10 +357,10 @@ SharedPtr<Image> FontFaceBitmap::SaveFaceTexture(Texture2D* texture)
 {
     Image* image = new Image(font_->GetContext());
     image->SetSize(texture->GetWidth(), texture->GetHeight(), ConvertFormatToNumComponents(texture->GetFormat()));
-    if (!static_cast<Texture2D*>(texture)->GetData(0, image->GetData()))
+    if (!texture->GetData(0, image->GetData()))
     {
         delete image;
-        LOGERROR("Could not save texture to image resource");
+        URHO3D_LOGERROR("Could not save texture to image resource");
         return SharedPtr<Image>();
     }
     return SharedPtr<Image>(image);
@@ -377,7 +378,7 @@ void FontFaceBitmap::Blit(Image* dest, int x, int y, int width, int height, Imag
     unsigned char* sourceData = source->GetData() + (sourceY * source->GetWidth() + sourceX) * components;
     for (int i = 0; i < height; ++i)
     {
-        memcpy(destData, sourceData, width * components);
+        memcpy(destData, sourceData, (size_t)(width * components));
         destData += dest->GetWidth() * components;
         sourceData += source->GetWidth() * components;
     }

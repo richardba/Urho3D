@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -37,12 +37,14 @@ static const unsigned DEBUGHUD_SHOW_NONE = 0x0;
 static const unsigned DEBUGHUD_SHOW_STATS = 0x1;
 static const unsigned DEBUGHUD_SHOW_MODE = 0x2;
 static const unsigned DEBUGHUD_SHOW_PROFILER = 0x4;
+static const unsigned DEBUGHUD_SHOW_MEMORY = 0x8;
 static const unsigned DEBUGHUD_SHOW_ALL = 0x7;
+static const unsigned DEBUGHUD_SHOW_ALL_MEMORY = 0xB;
 
 /// Displays rendering stats and profiling information.
 class URHO3D_API DebugHud : public Object
 {
-    OBJECT(DebugHud);
+    URHO3D_OBJECT(DebugHud, Object);
 
 public:
     /// Construct.
@@ -69,21 +71,31 @@ public:
 
     /// Return the UI style file.
     XMLFile* GetDefaultStyle() const;
+
     /// Return rendering stats text.
     Text* GetStatsText() const { return statsText_; }
+
     /// Return rendering mode text.
     Text* GetModeText() const { return modeText_; }
+
     /// Return profiler text.
     Text* GetProfilerText() const { return profilerText_; }
+
+    /// Return memory text.
+    Text* GetMemoryText() const { return memoryText_; }
+
     /// Return currently shown elements.
     unsigned GetMode() const { return mode_; }
+
     /// Return maximum profiler block depth.
     unsigned GetProfilerMaxDepth() const { return profilerMaxDepth_; }
+
     /// Return profiler accumulation interval in seconds
     float GetProfilerInterval() const;
 
     /// Return whether showing 3D geometry primitive/batch count only.
     bool GetUseRendererStats() const { return useRendererStats_; }
+
     /// Set application-specific stats.
     void SetAppStats(const String& label, const Variant& stats);
     /// Set application-specific stats.
@@ -103,6 +115,8 @@ private:
     SharedPtr<Text> modeText_;
     /// Profiling information text.
     SharedPtr<Text> profilerText_;
+    /// Memory stats text.
+    SharedPtr<Text> memoryText_;
     /// Hashmap containing application specific stats.
     HashMap<String, String> appStats_;
     /// Profiler timer.

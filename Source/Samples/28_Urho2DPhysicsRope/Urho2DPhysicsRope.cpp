@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,32 +20,30 @@
 // THE SOFTWARE.
 //
 
-#include <Urho3D/Urho3D.h>
-
+#include <Urho3D/Core/CoreEvents.h>
+#include <Urho3D/Engine/Engine.h>
 #include <Urho3D/Graphics/Camera.h>
+#include <Urho3D/Graphics/DebugRenderer.h>
+#include <Urho3D/Graphics/Graphics.h>
+#include <Urho3D/Graphics/Octree.h>
+#include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Input/Input.h>
+#include <Urho3D/Scene/Scene.h>
+#include <Urho3D/Scene/SceneEvents.h>
+#include <Urho3D/UI/Font.h>
+#include <Urho3D/UI/Text.h>
 #include <Urho3D/Urho2D/CollisionBox2D.h>
 #include <Urho3D/Urho2D/CollisionEdge2D.h>
 #include <Urho3D/Urho2D/ConstraintRevolute2D.h>
 #include <Urho3D/Urho2D/ConstraintRope2D.h>
-#include <Urho3D/Core/CoreEvents.h>
-#include <Urho3D/Graphics/DebugRenderer.h>
-#include <Urho3D/Engine/Engine.h>
-#include <Urho3D/UI/Font.h>
-#include <Urho3D/Graphics/Graphics.h>
-#include <Urho3D/Input/Input.h>
-#include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Urho2D/PhysicsWorld2D.h>
-#include <Urho3D/Graphics/Renderer.h>
 #include <Urho3D/Urho2D/RigidBody2D.h>
-#include <Urho3D/Scene/Scene.h>
-#include <Urho3D/Scene/SceneEvents.h>
-#include <Urho3D/UI/Text.h>
 
 #include "Urho2DPhysicsRope.h"
 
 #include <Urho3D/DebugNew.h>
 
-DEFINE_APPLICATION_MAIN(Urho2DPhysicsRope)
+URHO3D_DEFINE_APPLICATION_MAIN(Urho2DPhysicsRope)
 
 static const unsigned NUM_OBJECTS = 10;
 
@@ -70,6 +68,9 @@ void Urho2DPhysicsRope::Start()
 
     // Hook up to the frame update events
     SubscribeToEvents();
+
+    // Set the mouse mode to use in the sample
+    Sample::InitMouseMode(MM_FREE);
 }
 
 void Urho2DPhysicsRope::CreateScene()
@@ -211,7 +212,7 @@ void Urho2DPhysicsRope::MoveCamera(float timeStep)
 void Urho2DPhysicsRope::SubscribeToEvents()
 {
     // Subscribe HandleUpdate() function for processing update events
-    SubscribeToEvent(E_UPDATE, HANDLER(Urho2DPhysicsRope, HandleUpdate));
+    SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Urho2DPhysicsRope, HandleUpdate));
 
     // Unsubscribe the SceneUpdate event from base class to prevent camera pitch and yaw in 2D sample
     UnsubscribeFromEvent(E_SCENEUPDATE);

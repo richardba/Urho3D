@@ -21,6 +21,9 @@ function Start()
     -- Setup the viewport for displaying the scene
     SetupViewport()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE)
+
     -- Hook up to the frame update and render post-update events
     SubscribeToEvents()
 end
@@ -82,6 +85,7 @@ function CreateScene()
         -- Enable full blending weight and looping
         state.weight = 1.0
         state.looped = true
+        state.time = Random(walkAnimation.length)
 
         -- Create our Mover script object that will move & animate the model during each frame's update.
 
@@ -170,7 +174,7 @@ end
 
 function HandleUpdate(eventType, eventData)
     -- Take the frame time step, which is stored as a float
-    local timeStep = eventData:GetFloat("TimeStep")
+    local timeStep = eventData["TimeStep"]:GetFloat()
 
     -- Move the camera, scale movement with time step
     MoveCamera(timeStep)
@@ -201,7 +205,7 @@ function Mover:SetParameters(moveSpeed, rotationSpeed, bounds)
 end
 
 function Mover:Update(timeStep)
-    local node = self:GetNode()
+    local node = self.node
     node:Translate(Vector3(0.0, 0.0, 1.0) * self.moveSpeed * timeStep)
 
     -- If in risk of going outside the plane, rotate the model right

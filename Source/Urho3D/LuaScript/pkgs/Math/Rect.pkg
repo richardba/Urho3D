@@ -9,8 +9,8 @@ class Rect
     Rect(const Vector4& vector);
     ~Rect();
 
-    bool operator == (const Rect& rhs) const;
-    
+    bool operator ==(const Rect& rhs) const;
+
     void Define(const Rect& rect);
     void Define(const Vector2& min, const Vector2& max);
     void Define(const Vector2& point);
@@ -18,6 +18,8 @@ class Rect
     void Merge(const Rect& rect);
     void Clear();
     void Clip(const Rect& rect);
+    
+    bool Defined() const;
     Vector2 Center() const;
     Vector2 Size() const;
     Vector2 HalfSize() const;
@@ -26,13 +28,13 @@ class Rect
     Vector4 ToVector4() const;
     
     String ToString() const;
-    
+
     Vector2 min_ @ min;
     Vector2 max_ @ max;
     static const Rect FULL;
     static const Rect POSITIVE;
     static const Rect ZERO;
-    
+
     tolua_readonly tolua_property__no_prefix Vector2 center;
     tolua_readonly tolua_property__no_prefix Vector2 size;
     tolua_readonly tolua_property__no_prefix Vector2 halfSize;
@@ -44,20 +46,20 @@ class IntRect
     IntRect(int left, int top, int right, int bottom);
     ~IntRect();
 
-    bool operator == (const IntRect& rhs) const;
-    
+    bool operator ==(const IntRect& rhs) const;
+
     IntVector2 Size() const;
     int Width() const;
     int Height() const;
     Intersection IsInside(const IntVector2& point) const;
-    
+
     int left_ @ left;
     int top_ @ top;
     int right_ @ right;
     int bottom_ @ bottom;
-    
+
     static const IntRect ZERO;
-    
+
     tolua_readonly tolua_property__no_prefix IntVector2 size;
     tolua_readonly tolua_property__no_prefix int width;
     tolua_readonly tolua_property__no_prefix int height;

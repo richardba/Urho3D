@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,6 +21,12 @@
 //
 
 #pragma once
+
+#ifdef URHO3D_IS_BUILDING
+#include "Urho3D.h"
+#else
+#include <Urho3D/Urho3D.h>
+#endif
 
 namespace Urho3D
 {

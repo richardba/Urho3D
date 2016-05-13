@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,8 @@
 #pragma once
 
 #include "../Math/Color.h"
-#include "../Scene/Component.h"
 #include "../Math/Frustum.h"
+#include "../Scene/Component.h"
 
 namespace Urho3D
 {
@@ -47,7 +47,7 @@ struct DebugLine
     DebugLine()
     {
     }
-    
+
     /// Construct with start and end positions and color.
     DebugLine(const Vector3& start, const Vector3& end, unsigned color) :
         start_(start),
@@ -55,7 +55,7 @@ struct DebugLine
         color_(color)
     {
     }
-    
+
     /// Start position.
     Vector3 start_;
     /// End position.
@@ -94,8 +94,8 @@ struct DebugTriangle
 /// Debug geometry rendering component. Should be added only to the root scene node.
 class URHO3D_API DebugRenderer : public Component
 {
-    OBJECT(DebugRenderer);
-    
+    URHO3D_OBJECT(DebugRenderer, Component);
+
 public:
     /// Construct.
     DebugRenderer(Context* context);
@@ -103,7 +103,7 @@ public:
     virtual ~DebugRenderer();
     /// Register object factory.
     static void RegisterObject(Context* context);
-    
+
     /// Set the camera viewpoint. Call before rendering, or before adding geometry if you want to use culling.
     void SetView(Camera* camera);
     /// Add a line.
@@ -126,26 +126,42 @@ public:
     void AddPolyhedron(const Polyhedron& poly, const Color& color, bool depthTest = true);
     /// Add a sphere.
     void AddSphere(const Sphere& sphere, const Color& color, bool depthTest = true);
+    /// Add a cylinder
+    void AddCylinder(const Vector3& position, float radius, float height, const Color& color, bool depthTest = true);
     /// Add a skeleton.
     void AddSkeleton(const Skeleton& skeleton, const Color& color, bool depthTest = true);
     /// Add a triangle mesh.
-    void AddTriangleMesh(const void* vertexData, unsigned vertexSize, const void* indexData, unsigned indexSize, unsigned indexStart, unsigned indexCount, const Matrix3x4& transform, const Color& color, bool depthTest = true);
+    void AddTriangleMesh
+        (const void* vertexData, unsigned vertexSize, const void* indexData, unsigned indexSize, unsigned indexStart,
+            unsigned indexCount, const Matrix3x4& transform, const Color& color, bool depthTest = true);
+    /// Add a circle.
+    void AddCircle(const Vector3& center, const Vector3& normal, float radius, const Color& color, int steps = 64, bool depthTest = true);
+    /// Add a cross.
+    void AddCross(const Vector3& center, float size, const Color& color, bool depthTest = true);
+    /// Add a quad on the XZ plane.
+    void AddQuad(const Vector3& center, float width, float height, const Color& color, bool depthTest = true);
+
     /// Update vertex buffer and render all debug lines. The viewport and rendertarget should be set before.
     void Render();
-    
+
     /// Return the view transform.
     const Matrix3x4& GetView() const { return view_; }
+
     /// Return the projection transform.
     const Matrix4& GetProjection() const { return projection_; }
+
     /// Return the view frustum.
     const Frustum& GetFrustum() const { return frustum_; }
+
     /// Check whether a bounding box is inside the view frustum.
     bool IsInside(const BoundingBox& box) const;
-    
+    /// Return whether has something to render.
+    bool HasContent() const;
+
 private:
     /// Handle end of frame. Clear debug geometry.
     void HandleEndFrame(StringHash eventType, VariantMap& eventData);
-    
+
     /// Lines rendered with depth test.
     PODVector<DebugLine> lines_;
     /// Lines rendered without depth test.

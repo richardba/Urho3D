@@ -27,6 +27,9 @@ void Start()
     // Setup the viewport for displaying the scene
     SetupViewport();
 
+    // Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE);
+
     // Hook up to the frame update and render post-update events
     SubscribeToEvents();
 }
@@ -114,8 +117,10 @@ void CreateScene()
     Camera@ camera = cameraNode.CreateComponent("Camera");
     camera.farClip = 300.0f;
 
-    // Set an initial position for the camera scene node above the plane
-    cameraNode.position = Vector3(0.0f, 5.0f, 0.0f);
+    // Set an initial position for the camera scene node above the plane and looking down
+    cameraNode.position = Vector3(0.0f, 50.0f, 0.0f);
+    pitch = 80.0f;
+    cameraNode.rotation = Quaternion(pitch, yaw, 0.0f);
 }
 
 void CreateUI()
@@ -134,7 +139,7 @@ void CreateUI()
     instructionText.text =
         "Use WASD keys to move, RMB to rotate view\n"
         "LMB to set destination, SHIFT+LMB to teleport\n"
-        "MMB to add or remove obstacles\n"
+        "MMB or O key to add or remove obstacles\n"
         "Space to toggle debug geometry";
     instructionText.SetFont(cache.GetResource("Font", "Fonts/Anonymous Pro.ttf"), 15);
     // The text has multiple rows. Center them in relation to each other
@@ -165,8 +170,14 @@ void SubscribeToEvents()
 
 void MoveCamera(float timeStep)
 {
+    input.mouseVisible = input.mouseMode != MM_RELATIVE;
+    bool mouseDown = input.mouseButtonDown[MOUSEB_RIGHT];
+
+    // Override the MM_RELATIVE mouse grabbed settings, to allow interaction with UI
+    input.mouseGrabbed = mouseDown;
+
     // Right mouse button controls mouse cursor visibility: hide when pressed
-    ui.cursor.visible = !input.mouseButtonDown[MOUSEB_RIGHT];
+    ui.cursor.visible = !mouseDown;
 
     // Do not move if the UI has a focused element (the console)
     if (ui.focusElement !is null)
@@ -204,7 +215,7 @@ void MoveCamera(float timeStep)
     if (input.mouseButtonPress[MOUSEB_LEFT])
         SetPathPoint();
     // Add or remove objects with middle mouse button, then rebuild navigation mesh partially
-    if (input.mouseButtonPress[MOUSEB_MIDDLE])
+    if (input.mouseButtonPress[MOUSEB_MIDDLE] || input.keyPress['O'])
         AddOrRemoveObject();
 
     // Toggle debug geometry with space

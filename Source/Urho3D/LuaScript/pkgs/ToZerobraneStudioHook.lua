@@ -1,5 +1,5 @@
 --
--- Copyright (c) 2008-2015 the Urho3D project.
+-- Copyright (c) 2008-2016 the Urho3D project.
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -107,7 +107,8 @@ function writeFunctionArgs(file, declarations)
       if declaration.def ~= "" then
         param_str = param_str .. " = " .. declaration.def
       end
-      file:write(param_str)
+      local fixedParamStr = param_str:gsub([[(")]], [[\%1]])
+      file:write(fixedParamStr)
     end
     if i ~= count then
       file:write(", ")

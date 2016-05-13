@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,15 +20,16 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
 #include "../Core/CoreEvents.h"
-#include "../IO/File.h"
-#include "../IO/IOEvents.h"
-#include "../IO/Log.h"
-#include "../Core/Mutex.h"
 #include "../Core/ProcessUtils.h"
 #include "../Core/Thread.h"
 #include "../Core/Timer.h"
+#include "../IO/File.h"
+#include "../IO/IOEvents.h"
+#include "../IO/Log.h"
 
 #include <cstdio>
 
@@ -68,8 +69,8 @@ Log::Log(Context* context) :
     quiet_(false)
 {
     logInstance = this;
-    
-    SubscribeToEvent(E_ENDFRAME, HANDLER(Log, HandleEndFrame));
+
+    SubscribeToEvent(E_ENDFRAME, URHO3D_HANDLER(Log, HandleEndFrame));
 }
 
 Log::~Log()
@@ -79,7 +80,7 @@ Log::~Log()
 
 void Log::Open(const String& fileName)
 {
-    #if !defined(ANDROID) && !defined(IOS)
+#if !defined(ANDROID) && !defined(IOS)
     if (fileName.Empty())
         return;
     if (logFile_ && logFile_->IsOpen())
@@ -98,18 +99,18 @@ void Log::Open(const String& fileName)
         logFile_.Reset();
         Write(LOG_ERROR, "Failed to create log file " + fileName);
     }
-    #endif
+#endif
 }
 
 void Log::Close()
 {
-    #if !defined(ANDROID) && !defined(IOS)
+#if !defined(ANDROID) && !defined(IOS)
     if (logFile_ && logFile_->IsOpen())
     {
         logFile_->Close();
         logFile_.Reset();
     }
-    #endif
+#endif
 }
 
 void Log::SetLevel(int level)
@@ -131,6 +132,13 @@ void Log::SetQuiet(bool quiet)
 
 void Log::Write(int level, const String& message)
 {
+    // Special case for LOG_RAW level
+    if (level == LOG_RAW)
+    {
+        WriteRaw(message, false);
+        return;
+    }
+
     assert(level >= LOG_DEBUG && level < LOG_NONE);
 
     // If not in the main thread, store message for later processing
@@ -141,7 +149,7 @@ void Log::Write(int level, const String& message)
             MutexLock lock(logInstance->logMutex_);
             logInstance->threadMessages_.Push(StoredLogMessage(message, level, false));
         }
-        
+
         return;
     }
 
@@ -156,12 +164,12 @@ void Log::Write(int level, const String& message)
     if (logInstance->timeStamp_)
         formattedMessage = "[" + Time::GetTimeStamp() + "] " + formattedMessage;
 
-    #if defined(ANDROID)
+#if defined(ANDROID)
     int androidLevel = ANDROID_LOG_DEBUG + level;
     __android_log_print(androidLevel, "Urho3D", "%s", message.CString());
-    #elif defined(IOS)
+#elif defined(IOS)
     SDL_IOS_LogMessage(message.CString());
-    #else
+#else
     if (logInstance->quiet_)
     {
         // If in quiet mode, still print the error message to the standard error stream
@@ -170,7 +178,7 @@ void Log::Write(int level, const String& message)
     }
     else
         PrintUnicodeLine(formattedMessage, level == LOG_ERROR);
-    #endif
+#endif
 
     if (logInstance->logFile_)
     {
@@ -200,17 +208,17 @@ void Log::WriteRaw(const String& message, bool error)
             MutexLock lock(logInstance->logMutex_);
             logInstance->threadMessages_.Push(StoredLogMessage(message, LOG_RAW, error));
         }
-        
+
         return;
     }
-    
+
     // Prevent recursion during log event
     if (!logInstance || logInstance->inWrite_)
         return;
 
     logInstance->lastMessage_ = message;
 
-    #if defined(ANDROID)
+#if defined(ANDROID)
     if (logInstance->quiet_)
     {
         if (error)
@@ -218,9 +226,9 @@ void Log::WriteRaw(const String& message, bool error)
     }
     else
         __android_log_print(error ? ANDROID_LOG_ERROR : ANDROID_LOG_INFO, "Urho3D", message.CString());
-    #elif defined(IOS)
+#elif defined(IOS)
     SDL_IOS_LogMessage(message.CString());
-    #else
+#else
     if (logInstance->quiet_)
     {
         // If in quiet mode, still print the error message to the standard error stream
@@ -229,7 +237,7 @@ void Log::WriteRaw(const String& message, bool error)
     }
     else
         PrintUnicode(message, error);
-    #endif
+#endif
 
     if (logInstance->logFile_)
     {
@@ -263,17 +271,17 @@ void Log::HandleEndFrame(StringHash eventType, VariantMap& eventData)
     }
 
     MutexLock lock(logMutex_);
-    
+
     // Process messages accumulated from other threads (if any)
     while (!threadMessages_.Empty())
     {
         const StoredLogMessage& stored = threadMessages_.Front();
-        
+
         if (stored.level_ != LOG_RAW)
             Write(stored.level_, stored.message_);
         else
             WriteRaw(stored.message_, stored.error_);
-        
+
         threadMessages_.PopFront();
     }
 }

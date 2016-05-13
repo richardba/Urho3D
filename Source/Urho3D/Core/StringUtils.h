@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +35,10 @@ URHO3D_API bool ToBool(const char* source);
 URHO3D_API float ToFloat(const String& source);
 /// Parse a float from a C string.
 URHO3D_API float ToFloat(const char* source);
+/// Parse a double from a string.
+URHO3D_API double ToDouble(const String& source);
+/// Parse a double from a C string.
+URHO3D_API double ToDouble(const char* source);
 /// Parse an integer from a string.
 URHO3D_API int ToInt(const String& source);
 /// Parse an integer from a C string.
@@ -117,5 +121,7 @@ URHO3D_API bool IsDigit(unsigned ch);
 URHO3D_API unsigned ToUpper(unsigned ch);
 /// Return char in lowercase.
 URHO3D_API unsigned ToLower(unsigned ch);
+/// Convert a memory size into a formatted size string, of the style "1.5 Mb".
+URHO3D_API String GetFileSizeString(unsigned long long memorySize);
 
 }

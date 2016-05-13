@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,12 +20,9 @@
 // THE SOFTWARE.
 //
 
-#include <Urho3D/Urho3D.h>
-
 #include <Urho3D/Graphics/AnimatedModel.h>
 #include <Urho3D/Graphics/AnimationState.h>
 #include <Urho3D/Scene/Scene.h>
-#include <Urho3D/Scene/SceneEvents.h>
 
 #include "Mover.h"
 
@@ -50,12 +47,12 @@ void Mover::SetParameters(float moveSpeed, float rotationSpeed, const BoundingBo
 void Mover::Update(float timeStep)
 {
     node_->Translate(Vector3::FORWARD * moveSpeed_ * timeStep);
-    
+
     // If in risk of going outside the plane, rotate the model right
     Vector3 pos = node_->GetPosition();
     if (pos.x_ < bounds_.min_.x_ || pos.x_ > bounds_.max_.x_ || pos.z_ < bounds_.min_.z_ || pos.z_ > bounds_.max_.z_)
         node_->Yaw(rotationSpeed_ * timeStep);
-    
+
     // Get the model's first (only) animation state and advance its time. Note the convenience accessor to other components
     // in the same scene node
     AnimatedModel* model = GetComponent<AnimatedModel>();

@@ -23,6 +23,9 @@ function Start()
     -- Setup the viewport for displaying the scene
     SetupViewport()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE)
+
     -- Hook up to the frame update event
     SubscribeToEvents()
 end
@@ -212,7 +215,7 @@ end
 
 function HandleUpdate(eventType, eventData)
     -- Take the frame time step, which is stored as a float
-    local timeStep = eventData:GetFloat("TimeStep")
+    local timeStep = eventData["TimeStep"]:GetFloat()
 
     -- Move the camera, scale movement with time step
     MoveCamera(timeStep)

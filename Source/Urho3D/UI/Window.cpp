@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,9 +20,11 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Core/Context.h"
-#include "../UI/Cursor.h"
 #include "../Input/InputEvents.h"
+#include "../UI/Cursor.h"
 #include "../UI/UI.h"
 #include "../UI/UIEvents.h"
 #include "../UI/Window.h"
@@ -49,7 +51,6 @@ Window::Window(Context* context) :
     modalShadeColor_(Color::TRANSPARENT),
     modalFrameColor_(Color::TRANSPARENT),
     modalFrameSize_(IntVector2::ZERO)
-
 {
     bringToFront_ = true;
     clipChildren_ = true;
@@ -64,20 +65,20 @@ void Window::RegisterObject(Context* context)
 {
     context->RegisterFactory<Window>(UI_CATEGORY);
 
-    COPY_BASE_ATTRIBUTES(BorderImage);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Bring To Front", true);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
-    UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
-    ACCESSOR_ATTRIBUTE("Resize Border", GetResizeBorder, SetResizeBorder, IntRect, IntRect(DEFAULT_RESIZE_BORDER, \
+    URHO3D_COPY_BASE_ATTRIBUTES(BorderImage);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Bring To Front", true);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Clip Children", true);
+    URHO3D_UPDATE_ATTRIBUTE_DEFAULT_VALUE("Is Enabled", true);
+    URHO3D_ACCESSOR_ATTRIBUTE("Resize Border", GetResizeBorder, SetResizeBorder, IntRect, IntRect(DEFAULT_RESIZE_BORDER, \
         DEFAULT_RESIZE_BORDER, DEFAULT_RESIZE_BORDER, DEFAULT_RESIZE_BORDER), AM_FILE);
-    ACCESSOR_ATTRIBUTE("Is Movable", IsMovable, SetMovable, bool, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Is Resizable", IsResizable, SetResizable, bool, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Fixed Width Resizing", GetFixedWidthResizing, SetFixedWidthResizing, bool, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Fixed Height Resizing", GetFixedHeightResizing, SetFixedHeightResizing, bool, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Is Modal", IsModal, SetModal, bool, false, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Modal Shade Color", GetModalShadeColor, SetModalShadeColor, Color, Color::TRANSPARENT, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Modal Frame Color", GetModalFrameColor, SetModalFrameColor, Color, Color::TRANSPARENT, AM_FILE);
-    ACCESSOR_ATTRIBUTE("Modal Frame Size", GetModalFrameSize, SetModalFrameSize, IntVector2, IntVector2::ZERO, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Movable", IsMovable, SetMovable, bool, false, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Resizable", IsResizable, SetResizable, bool, false, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Fixed Width Resizing", GetFixedWidthResizing, SetFixedWidthResizing, bool, false, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Fixed Height Resizing", GetFixedHeightResizing, SetFixedHeightResizing, bool, false, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Modal", IsModal, SetModal, bool, false, AM_FILE | AM_NOEDIT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Modal Shade Color", GetModalShadeColor, SetModalShadeColor, Color, Color::TRANSPARENT, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Modal Frame Color", GetModalFrameColor, SetModalFrameColor, Color, Color::TRANSPARENT, AM_FILE);
+    URHO3D_ACCESSOR_ATTRIBUTE("Modal Frame Size", GetModalFrameSize, SetModalFrameSize, IntVector2, IntVector2::ZERO, AM_FILE);
     // Modal auto dismiss is purposefully not an attribute, as using it can make the editor lock up.
     // Instead it should be set false in code when needed
 }
@@ -105,7 +106,8 @@ void Window::GetBatches(PODVector<UIBatch>& batches, PODVector<float>& vertexDat
             IntVector2 size = GetSize();
             size.x_ -= x;
             batch.SetColor(modalFrameColor_);
-            batch.AddQuad(x - modalFrameSize_.x_, -modalFrameSize_.y_, size.x_ + 2 * modalFrameSize_.x_, size.y_ + 2 * modalFrameSize_.y_, 0, 0);
+            batch.AddQuad(x - modalFrameSize_.x_, -modalFrameSize_.y_, size.x_ + 2 * modalFrameSize_.x_,
+                size.y_ + 2 * modalFrameSize_.y_, 0, 0);
             UIBatch::AddOrMerge(batch, batches);
         }
     }
@@ -143,7 +145,8 @@ void Window::OnDragBegin(const IntVector2& position, const IntVector2& screenPos
     SetCursorShape(dragMode_, cursor);
 }
 
-void Window::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons, int qualifiers, Cursor* cursor)
+void Window::OnDragMove(const IntVector2& position, const IntVector2& screenPosition, const IntVector2& deltaPos, int buttons,
+    int qualifiers, Cursor* cursor)
 {
     if (dragMode_ == DRAG_NONE)
         return;
@@ -164,21 +167,25 @@ void Window::OnDragMove(const IntVector2& position, const IntVector2& screenPosi
         break;
 
     case DRAG_RESIZE_TOPLEFT:
-        SetPosition(Clamp(dragBeginPosition_.x_ + delta.x_, position_.x_ - (maxSize_.x_ - size_.x_), position_.x_ + (size_.x_ - minSize_.x_)),
-            Clamp(dragBeginPosition_.y_ + delta.y_, position_.y_ - (maxSize_.y_ - size_.y_), position_.y_ + (size_.y_ - minSize_.y_)));
+        SetPosition(Clamp(dragBeginPosition_.x_ + delta.x_, position_.x_ - (maxSize_.x_ - size_.x_),
+            position_.x_ + (size_.x_ - minSize_.x_)),
+            Clamp(dragBeginPosition_.y_ + delta.y_, position_.y_ - (maxSize_.y_ - size_.y_),
+                position_.y_ + (size_.y_ - minSize_.y_)));
         dragSize = dragBeginSize_ - delta;
         fixedWidthResizing_ ? SetFixedWidth(Max(dragSize.x_, resizeBorderSize.x_)) : SetWidth(dragSize.x_);
         fixedHeightResizing_ ? SetFixedHeight(Max(dragSize.y_, resizeBorderSize.y_)) : SetHeight(dragSize.y_);
         break;
 
     case DRAG_RESIZE_TOP:
-        SetPosition(dragBeginPosition_.x_, Clamp(dragBeginPosition_.y_ + delta.y_, position_.y_ - (maxSize_.y_ - size_.y_), position_.y_ + (size_.y_ - minSize_.y_)));
+        SetPosition(dragBeginPosition_.x_, Clamp(dragBeginPosition_.y_ + delta.y_, position_.y_ - (maxSize_.y_ - size_.y_),
+            position_.y_ + (size_.y_ - minSize_.y_)));
         dragSize = IntVector2(dragBeginSize_.x_, dragBeginSize_.y_ - delta.y_);
         fixedHeightResizing_ ? SetFixedHeight(Max(dragSize.y_, resizeBorderSize.y_)) : SetHeight(dragSize.y_);
         break;
 
     case DRAG_RESIZE_TOPRIGHT:
-        SetPosition(dragBeginPosition_.x_, Clamp(dragBeginPosition_.y_ + delta.y_, position_.y_ - (maxSize_.y_ - size_.y_), position_.y_ + (size_.y_ - minSize_.y_)));
+        SetPosition(dragBeginPosition_.x_, Clamp(dragBeginPosition_.y_ + delta.y_, position_.y_ - (maxSize_.y_ - size_.y_),
+            position_.y_ + (size_.y_ - minSize_.y_)));
         dragSize = IntVector2(dragBeginSize_.x_ + delta.x_, dragBeginSize_.y_ - delta.y_);
         fixedWidthResizing_ ? SetFixedWidth(Max(dragSize.x_, resizeBorderSize.x_)) : SetWidth(dragSize.x_);
         fixedHeightResizing_ ? SetFixedHeight(Max(dragSize.y_, resizeBorderSize.y_)) : SetHeight(dragSize.y_);
@@ -201,14 +208,16 @@ void Window::OnDragMove(const IntVector2& position, const IntVector2& screenPosi
         break;
 
     case DRAG_RESIZE_BOTTOMLEFT:
-        SetPosition(Clamp(dragBeginPosition_.x_ + delta.x_, position_.x_ - (maxSize_.x_ - size_.x_), position_.x_ + (size_.x_ - minSize_.x_)), dragBeginPosition_.y_);
+        SetPosition(Clamp(dragBeginPosition_.x_ + delta.x_, position_.x_ - (maxSize_.x_ - size_.x_),
+            position_.x_ + (size_.x_ - minSize_.x_)), dragBeginPosition_.y_);
         dragSize = IntVector2(dragBeginSize_.x_ - delta.x_, dragBeginSize_.y_ + delta.y_);
         fixedWidthResizing_ ? SetFixedWidth(Max(dragSize.x_, resizeBorderSize.x_)) : SetWidth(dragSize.x_);
         fixedHeightResizing_ ? SetFixedHeight(Max(dragSize.y_, resizeBorderSize.y_)) : SetHeight(dragSize.y_);
         break;
 
     case DRAG_RESIZE_LEFT:
-        SetPosition(Clamp(dragBeginPosition_.x_ + delta.x_, position_.x_ - (maxSize_.x_ - size_.x_), position_.x_ + (size_.x_ - minSize_.x_)), dragBeginPosition_.y_);
+        SetPosition(Clamp(dragBeginPosition_.x_ + delta.x_, position_.x_ - (maxSize_.x_ - size_.x_),
+            position_.x_ + (size_.x_ - minSize_.x_)), dragBeginPosition_.y_);
         dragSize = IntVector2(dragBeginSize_.x_ - delta.x_, dragBeginSize_.y_);
         fixedWidthResizing_ ? SetFixedWidth(Max(dragSize.x_, resizeBorderSize.x_)) : SetWidth(dragSize.x_);
         break;
@@ -228,7 +237,8 @@ void Window::OnDragEnd(const IntVector2& position, const IntVector2& screenPosit
     dragMode_ = DRAG_NONE;
 }
 
-void Window::OnDragCancel(const IntVector2& position, const IntVector2& screenPosition, int dragButtons, int buttons, Cursor* cursor)
+void Window::OnDragCancel(const IntVector2& position, const IntVector2& screenPosition, int dragButtons, int buttons,
+    Cursor* cursor)
 {
     UIElement::OnDragCancel(position, screenPosition, dragButtons, buttons, cursor);
 
@@ -270,7 +280,12 @@ void Window::SetResizeBorder(const IntRect& rect)
 
 void Window::SetModal(bool modal)
 {
-    if (GetSubsystem<UI>()->SetModalElement(this, modal))
+    UI* ui = GetSubsystem<UI>();
+    // Can be null at exit time; no-op in that case
+    if (!ui)
+        return;
+
+    if (ui->SetModalElement(this, modal))
     {
         modal_ = modal;
 

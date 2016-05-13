@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,18 +20,20 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
+#include "../Core/Context.h"
+#include "../Core/Profiler.h"
 #include "../Graphics/AnimatedModel.h"
 #include "../Graphics/Batch.h"
 #include "../Graphics/Camera.h"
-#include "../Core/Context.h"
-#include "../IO/FileSystem.h"
 #include "../Graphics/Geometry.h"
-#include "../IO/Log.h"
 #include "../Graphics/Material.h"
-#include "../Graphics/Model.h"
 #include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/OctreeQuery.h"
-#include "../Core/Profiler.h"
+#include "../Graphics/VertexBuffer.h"
+#include "../IO/FileSystem.h"
+#include "../IO/Log.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/ResourceEvents.h"
 
@@ -57,17 +59,18 @@ void StaticModel::RegisterObject(Context* context)
 {
     context->RegisterFactory<StaticModel>(GEOMETRY_CATEGORY);
 
-    ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
-    MIXED_ACCESSOR_ATTRIBUTE("Model", GetModelAttr, SetModelAttr, ResourceRef, ResourceRef(Model::GetTypeStatic()), AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Material", GetMaterialsAttr, SetMaterialsAttr, ResourceRefList, ResourceRefList(Material::GetTypeStatic()), AM_DEFAULT);
-    ATTRIBUTE("Is Occluder", bool, occluder_, false, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Can Be Occluded", IsOccludee, SetOccludee, bool, true, AM_DEFAULT);
-    ATTRIBUTE("Cast Shadows", bool, castShadows_, false, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Draw Distance", GetDrawDistance, SetDrawDistance, float, 0.0f, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("Shadow Distance", GetShadowDistance, SetShadowDistance, float, 0.0f, AM_DEFAULT);
-    ACCESSOR_ATTRIBUTE("LOD Bias", GetLodBias, SetLodBias, float, 1.0f, AM_DEFAULT);
-    COPY_BASE_ATTRIBUTES(Drawable);
-    ATTRIBUTE("Occlusion LOD Level", int, occlusionLodLevel_, M_MAX_UNSIGNED, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Model", GetModelAttr, SetModelAttr, ResourceRef, ResourceRef(Model::GetTypeStatic()), AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Material", GetMaterialsAttr, SetMaterialsAttr, ResourceRefList, ResourceRefList(Material::GetTypeStatic()),
+        AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Is Occluder", bool, occluder_, false, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Can Be Occluded", IsOccludee, SetOccludee, bool, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Cast Shadows", bool, castShadows_, false, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Draw Distance", GetDrawDistance, SetDrawDistance, float, 0.0f, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("Shadow Distance", GetShadowDistance, SetShadowDistance, float, 0.0f, AM_DEFAULT);
+    URHO3D_ACCESSOR_ATTRIBUTE("LOD Bias", GetLodBias, SetLodBias, float, 1.0f, AM_DEFAULT);
+    URHO3D_COPY_BASE_ATTRIBUTES(Drawable);
+    URHO3D_ATTRIBUTE("Occlusion LOD Level", int, occlusionLodLevel_, M_MAX_UNSIGNED, AM_DEFAULT);
 }
 
 void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQueryResult>& results)
@@ -82,12 +85,15 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
 
     case RAY_OBB:
     case RAY_TRIANGLE:
+    case RAY_TRIANGLE_UV:
         Matrix3x4 inverse(node_->GetWorldTransform().Inverse());
         Ray localRay = query.ray_.Transformed(inverse);
         float distance = localRay.HitDistance(boundingBox_);
         Vector3 normal = -query.ray_.direction_;
+        Vector2 geometryUV;
+        unsigned hitBatch = M_MAX_UNSIGNED;
 
-        if (level == RAY_TRIANGLE && distance < query.maxDistance_)
+        if (level >= RAY_TRIANGLE && distance < query.maxDistance_)
         {
             distance = M_INFINITY;
 
@@ -97,11 +103,13 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
                 if (geometry)
                 {
                     Vector3 geometryNormal;
-                    float geometryDistance = geometry->GetHitDistance(localRay, &geometryNormal);
+                    float geometryDistance = level == RAY_TRIANGLE ? geometry->GetHitDistance(localRay, &geometryNormal) :
+                        geometry->GetHitDistance(localRay, &geometryNormal, &geometryUV);
                     if (geometryDistance < query.maxDistance_ && geometryDistance < distance)
                     {
                         distance = geometryDistance;
                         normal = (node_->GetWorldTransform() * Vector4(geometryNormal, 0.0f)).Normalized();
+                        hitBatch = i;
                     }
                 }
             }
@@ -112,10 +120,11 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
             RayQueryResult result;
             result.position_ = query.ray_.origin_ + distance * query.ray_.direction_;
             result.normal_ = normal;
+            result.textureUV_ = geometryUV;
             result.distance_ = distance;
             result.drawable_ = this;
             result.node_ = node_;
-            result.subObject_ = M_MAX_UNSIGNED;
+            result.subObject_ = hitBatch;
             results.Push(result);
         }
         break;
@@ -125,21 +134,15 @@ void StaticModel::ProcessRayQuery(const RayOctreeQuery& query, PODVector<RayQuer
 void StaticModel::UpdateBatches(const FrameInfo& frame)
 {
     const BoundingBox& worldBoundingBox = GetWorldBoundingBox();
-    const Matrix3x4& worldTransform = node_->GetWorldTransform();
     distance_ = frame.camera_->GetDistance(worldBoundingBox.Center());
 
-    if (batches_.Size() > 1)
-    {
-        for (unsigned i = 0; i < batches_.Size(); ++i)
-        {
-            batches_[i].distance_ = frame.camera_->GetDistance(worldTransform * geometryData_[i].center_);
-            batches_[i].worldTransform_ = &worldTransform;
-        }
-    }
-    else if (batches_.Size() == 1)
-    {
+    if (batches_.Size() == 1)
         batches_[0].distance_ = distance_;
-        batches_[0].worldTransform_ = &worldTransform;
+    else
+    {
+        const Matrix3x4& worldTransform = node_->GetWorldTransform();
+        for (unsigned i = 0; i < batches_.Size(); ++i)
+            batches_[i].distance_ = frame.camera_->GetDistance(worldTransform * geometryData_[i].center_);
     }
 
     float scale = worldBoundingBox.Size().DotProduct(DOT_SCALE);
@@ -208,18 +211,18 @@ bool StaticModel::DrawOcclusion(OcclusionBuffer* buffer)
         unsigned vertexSize;
         const unsigned char* indexData;
         unsigned indexSize;
-        unsigned elementMask;
+        const PODVector<VertexElement>* elements;
 
-        geometry->GetRawData(vertexData, vertexSize, indexData, indexSize, elementMask);
+        geometry->GetRawData(vertexData, vertexSize, indexData, indexSize, elements);
         // Check for valid geometry data
-        if (!vertexData || !indexData)
+        if (!vertexData || !indexData || !elements || VertexBuffer::GetElementOffset(*elements, TYPE_VECTOR3, SEM_POSITION) != 0)
             continue;
 
         unsigned indexStart = geometry->GetIndexStart();
         unsigned indexCount = geometry->GetIndexCount();
 
         // Draw and check for running out of triangles
-        if (!buffer->Draw(node_->GetWorldTransform(), vertexData, vertexSize, indexData, indexSize, indexStart, indexCount))
+        if (!buffer->AddTriangles(node_->GetWorldTransform(), vertexData, vertexSize, indexData, indexSize, indexStart, indexCount))
             return false;
     }
 
@@ -234,7 +237,7 @@ void StaticModel::SetModel(Model* model)
     // If script erroneously calls StaticModel::SetModel on an AnimatedModel, warn and redirect
     if (GetType() == AnimatedModel::GetTypeStatic())
     {
-        LOGWARNING("StaticModel::SetModel() called on AnimatedModel. Redirecting to AnimatedModel::SetModel()");
+        URHO3D_LOGWARNING("StaticModel::SetModel() called on AnimatedModel. Redirecting to AnimatedModel::SetModel()");
         AnimatedModel* animatedModel = static_cast<AnimatedModel*>(this);
         animatedModel->SetModel(model);
         return;
@@ -248,14 +251,16 @@ void StaticModel::SetModel(Model* model)
 
     if (model)
     {
-        SubscribeToEvent(model, E_RELOADFINISHED, HANDLER(StaticModel, HandleModelReloadFinished));
+        SubscribeToEvent(model, E_RELOADFINISHED, URHO3D_HANDLER(StaticModel, HandleModelReloadFinished));
 
         // Copy the subgeometry & LOD level structure
         SetNumGeometries(model->GetNumGeometries());
         const Vector<Vector<SharedPtr<Geometry> > >& geometries = model->GetGeometries();
         const PODVector<Vector3>& geometryCenters = model->GetGeometryCenters();
+        const Matrix3x4* worldTransform = node_ ? &node_->GetWorldTransform() : (const Matrix3x4*)0;
         for (unsigned i = 0; i < geometries.Size(); ++i)
         {
+            batches_[i].worldTransform_ = worldTransform;
             geometries_[i] = geometries[i];
             geometryData_[i].center_ = geometryCenters[i];
         }
@@ -284,7 +289,7 @@ bool StaticModel::SetMaterial(unsigned index, Material* material)
 {
     if (index >= batches_.Size())
     {
-        LOGERROR("Material index out of bounds");
+        URHO3D_LOGERROR("Material index out of bounds");
         return false;
     }
 

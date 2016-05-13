@@ -14,6 +14,96 @@ class EditActionGroup
     Array<EditAction@> actions;
 }
 
+class CreateDrawableMaskAction : EditAction
+{
+    uint nodeID;
+    uint drawableID;
+    int oldMask;
+    int redoMask;
+    int typeMask;
+
+    void Define(Drawable@ drawable, int editMaskType)
+    {
+        drawableID = drawable.id;
+        nodeID = drawable.node.id;
+        
+        switch (editMaskType) 
+        {
+            case EDIT_VIEW_MASK:
+                oldMask = drawable.viewMask;
+                break;
+            case EDIT_LIGHT_MASK:
+                oldMask = drawable.lightMask;
+                break;
+            case EDIT_SHADOW_MASK:
+                oldMask = drawable.shadowMask;
+                break;
+            case EDIT_ZONE_MASK:
+                oldMask = drawable.zoneMask;
+                break;
+        } 
+                
+        typeMask = editMaskType;
+        redoMask = oldMask;
+    }
+
+    void Undo()
+    {
+        Node@ node = editorScene.GetNode(nodeID);
+        Drawable@ drawable = editorScene.GetComponent(drawableID);
+        if (node !is null && drawable !is null)
+        {
+            switch (typeMask) 
+            {
+            case EDIT_VIEW_MASK:
+                redoMask = drawable.viewMask;
+                drawable.viewMask = oldMask;
+                break;
+            case EDIT_LIGHT_MASK:
+                redoMask = drawable.lightMask;
+                drawable.lightMask = oldMask;
+                break;
+            case EDIT_SHADOW_MASK:
+                redoMask = drawable.shadowMask;
+                drawable.shadowMask = oldMask;
+                break;
+            case EDIT_ZONE_MASK:
+                redoMask = drawable.zoneMask;
+                drawable.zoneMask = oldMask;
+                break;
+            }
+        }
+    }
+
+    void Redo()
+    {
+        Node@ node = editorScene.GetNode(nodeID);
+        Drawable@ drawable = editorScene.GetComponent(drawableID);
+        if (node !is null && drawable !is null)
+        {
+            switch (typeMask) 
+            {
+            case EDIT_VIEW_MASK:
+                oldMask = drawable.viewMask;
+                drawable.viewMask = redoMask;
+                break;
+            case EDIT_LIGHT_MASK:
+                oldMask = drawable.lightMask;
+                drawable.lightMask = redoMask;
+                break;
+            case EDIT_SHADOW_MASK:
+                oldMask = drawable.shadowMask;
+                drawable.shadowMask = redoMask;
+                break;
+            case EDIT_ZONE_MASK:
+                oldMask = drawable.zoneMask;
+                drawable.zoneMask = redoMask;
+                break;
+            }
+        }
+    }
+}
+
 class CreateNodeAction : EditAction
 {
     uint nodeID;
@@ -320,8 +410,6 @@ class EditAttributeAction : EditAction
                 SetUIElementModified(target);
             else
                 SetSceneModified();
-                
-            EditScriptAttributes(target, attrIndex);
         }
     }
 
@@ -341,8 +429,6 @@ class EditAttributeAction : EditAction
                 SetUIElementModified(target);
             else
                 SetSceneModified();
-                
-            EditScriptAttributes(target, attrIndex);
         }
     }
 }
@@ -731,10 +817,10 @@ class ApplyUIElementStyleAction : EditAction
                 XMLElement rootElem = elementData.root;
                 uint index = rootElem.GetUInt("index");
                 uint listItemIndex = rootElem.GetUInt("listItemIndex");
-                UIElement@ element = parent.children[index];
+                UIElement@ elem = parent.children[index];
                 UIElement@ parentItem = hierarchyList.items[GetListIndex(parent)];
-                UpdateHierarchyItem(listItemIndex, element, parentItem);
-                SetUIElementModified(element);
+                UpdateHierarchyItem(listItemIndex, elem, parentItem);
+                SetUIElementModified(elem);
                 hierarchyUpdateSelections.Push(listItemIndex);
             }
 

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+#include "../Precompiled.h"
 
 #include "../Graphics/OctreeQuery.h"
 
@@ -40,7 +42,7 @@ void PointOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool insi
     while (start != end)
     {
         Drawable* drawable = *start++;
-        
+
         if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
         {
             if (inside || drawable->GetWorldBoundingBox().IsInside(point_))
@@ -62,7 +64,7 @@ void SphereOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool ins
     while (start != end)
     {
         Drawable* drawable = *start++;
-        
+
         if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
         {
             if (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()))
@@ -84,7 +86,7 @@ void BoxOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool inside
     while (start != end)
     {
         Drawable* drawable = *start++;
-        
+
         if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
         {
             if (inside || box_.IsInsideFast(drawable->GetWorldBoundingBox()))
@@ -106,12 +108,29 @@ void FrustumOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool in
     while (start != end)
     {
         Drawable* drawable = *start++;
-        
+
         if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
         {
             if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
                 result_.Push(drawable);
         }
+    }
+}
+
+
+Intersection AllContentOctreeQuery::TestOctant(const BoundingBox& box, bool inside)
+{
+    return INSIDE;
+}
+
+void AllContentOctreeQuery::TestDrawables(Drawable** start, Drawable** end, bool inside)
+{
+    while (start != end)
+    {
+        Drawable* drawable = *start++;
+
+        if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
+            result_.Push(drawable);
     }
 }
 

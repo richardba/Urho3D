@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,20 +20,23 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Math/Color.h"
-#include "../Container/Str.h"
 
 #include <cstdio>
+
+#include "../DebugNew.h"
 
 namespace Urho3D
 {
 
 unsigned Color::ToUInt() const
 {
-    unsigned r = Clamp(((int)(r_ * 255.0f)), 0, 255);
-    unsigned g = Clamp(((int)(g_ * 255.0f)), 0, 255);
-    unsigned b = Clamp(((int)(b_ * 255.0f)), 0, 255);
-    unsigned a = Clamp(((int)(a_ * 255.0f)), 0, 255);
+    unsigned r = (unsigned)Clamp(((int)(r_ * 255.0f)), 0, 255);
+    unsigned g = (unsigned)Clamp(((int)(g_ * 255.0f)), 0, 255);
+    unsigned b = (unsigned)Clamp(((int)(b_ * 255.0f)), 0, 255);
+    unsigned a = (unsigned)Clamp(((int)(a_ * 255.0f)), 0, 255);
     return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
@@ -207,7 +210,7 @@ void Color::Invert(bool invertAlpha)
         a_ = 1.0f - a_;
 }
 
-Color Color::Lerp(const Color &rhs, float t) const
+Color Color::Lerp(const Color& rhs, float t) const
 {
     float invT = 1.0f - t;
     return Color(
@@ -235,7 +238,7 @@ float Color::Hue(float min, float max) const
 
     // Calculate and return hue
     if (Urho3D::Equals(g_, max))
-        return (b_ + 2.0f*chroma - r_) / (6.0f * chroma);
+        return (b_ + 2.0f * chroma - r_) / (6.0f * chroma);
     else if (Urho3D::Equals(b_, max))
         return (4.0f * chroma - g_ + r_) / (6.0f * chroma);
     else
@@ -277,7 +280,7 @@ void Color::FromHCM(float h, float c, float m)
         h -= floorf(h);
 
     float hs = h * 6.0f;
-    float x  = c * (1.0f - Urho3D::Abs(fmodf(hs, 2.0f) - 1.0f));
+    float x = c * (1.0f - Urho3D::Abs(fmodf(hs, 2.0f) - 1.0f));
 
     // Reconstruct r', g', b' from hue
     if (hs < 2.0f)
@@ -330,13 +333,13 @@ void Color::FromHCM(float h, float c, float m)
 
 
 const Color Color::WHITE;
-const Color Color::GRAY   (0.5f, 0.5f, 0.5f);
-const Color Color::BLACK  (0.0f, 0.0f, 0.0f);
-const Color Color::RED    (1.0f, 0.0f, 0.0f);
-const Color Color::GREEN  (0.0f, 1.0f, 0.0f);
-const Color Color::BLUE   (0.0f, 0.0f, 1.0f);
-const Color Color::CYAN   (0.0f, 1.0f, 1.0f);
+const Color Color::GRAY(0.5f, 0.5f, 0.5f);
+const Color Color::BLACK(0.0f, 0.0f, 0.0f);
+const Color Color::RED(1.0f, 0.0f, 0.0f);
+const Color Color::GREEN(0.0f, 1.0f, 0.0f);
+const Color Color::BLUE(0.0f, 0.0f, 1.0f);
+const Color Color::CYAN(0.0f, 1.0f, 1.0f);
 const Color Color::MAGENTA(1.0f, 0.0f, 1.0f);
-const Color Color::YELLOW (1.0f, 1.0f, 0.0f);
+const Color Color::YELLOW(1.0f, 1.0f, 0.0f);
 const Color Color::TRANSPARENT(0.0f, 0.0f, 0.0f, 0.0f);
 }

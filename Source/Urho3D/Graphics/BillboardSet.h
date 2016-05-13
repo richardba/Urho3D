@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,11 +22,11 @@
 
 #pragma once
 
-#include "../Math/Color.h"
 #include "../Graphics/Drawable.h"
+#include "../IO/VectorBuffer.h"
+#include "../Math/Color.h"
 #include "../Math/Matrix3x4.h"
 #include "../Math/Rect.h"
-#include "../IO/VectorBuffer.h"
 
 namespace Urho3D
 {
@@ -47,6 +47,8 @@ struct URHO3D_API Billboard
     Color color_;
     /// Rotation.
     float rotation_;
+    /// Direction (For direction based billboard only).
+    Vector3 direction_;
     /// Enabled flag.
     bool enabled_;
     /// Sort distance.
@@ -58,7 +60,7 @@ static const unsigned MAX_BILLBOARDS = 65536 / 4;
 /// %Billboard component.
 class URHO3D_API BillboardSet : public Drawable
 {
-    OBJECT(BillboardSet);
+    URHO3D_OBJECT(BillboardSet, Drawable);
 
 public:
     /// Construct.
@@ -96,20 +98,28 @@ public:
 
     /// Return material.
     Material* GetMaterial() const;
+
     /// Return number of billboards.
     unsigned GetNumBillboards() const { return billboards_.Size(); }
+
     /// Return all billboards.
     PODVector<Billboard>& GetBillboards() { return billboards_; }
+
     /// Return billboard by index.
     Billboard* GetBillboard(unsigned index);
+
     /// Return whether billboards are relative to the scene node.
     bool IsRelative() const { return relative_; }
+
     /// Return whether scene node scale affects billboards' size.
     bool IsScaled() const { return scaled_; }
+
     /// Return whether billboards are sorted.
     bool IsSorted() const { return sorted_; }
+
     /// Return how the billboards rotate in relation to the camera.
     FaceCameraMode GetFaceCameraMode() const { return faceCameraMode_; }
+
     /// Return animation LOD bias.
     float GetAnimationLodBias() const { return animationLodBias_; }
 
@@ -169,6 +179,8 @@ private:
     bool bufferDirty_;
     /// Force update flag (ignore animation LOD momentarily.)
     bool forceUpdate_;
+    /// Update billboard geometry type
+    bool geometryTypeUpdate_;
     /// Sorting flag. Triggers a vertex buffer rewrite for each view this billboard set is rendered from.
     bool sortThisFrame_;
     /// Frame number on which was last sorted.

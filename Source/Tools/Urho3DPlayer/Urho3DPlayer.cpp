@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,30 +20,25 @@
 // THE SOFTWARE.
 //
 
-#include <Urho3D/Urho3D.h>
-
+#ifdef URHO3D_ANGELSCRIPT
+#include <Urho3D/AngelScript/ScriptFile.h>
+#include <Urho3D/AngelScript/Script.h>
+#endif
+#include <Urho3D/Core/Main.h>
 #include <Urho3D/Engine/Engine.h>
 #include <Urho3D/IO/FileSystem.h>
 #include <Urho3D/IO/Log.h>
-#include <Urho3D/Core/Main.h>
-#include <Urho3D/Core/ProcessUtils.h>
-#include <Urho3D/Resource/ResourceCache.h>
-#include <Urho3D/Resource/ResourceEvents.h>
-
-#ifdef URHO3D_ANGELSCRIPT
-#include <Urho3D/Script/ScriptFile.h>
-#include <Urho3D/Script/Script.h>
-#endif
-
 #ifdef URHO3D_LUA
 #include <Urho3D/LuaScript/LuaScript.h>
 #endif
+#include <Urho3D/Resource/ResourceCache.h>
+#include <Urho3D/Resource/ResourceEvents.h>
 
 #include "Urho3DPlayer.h"
 
 #include <Urho3D/DebugNew.h>
 
-DEFINE_APPLICATION_MAIN(Urho3DPlayer);
+URHO3D_DEFINE_APPLICATION_MAIN(Urho3DPlayer);
 
 Urho3DPlayer::Urho3DPlayer(Context* context) :
     Application(context)
@@ -89,6 +84,7 @@ void Urho3DPlayer::Setup()
             "-t           Enable triple buffering\n"
             "-w           Start in windowed mode\n"
             "-s           Enable resizing when in windowed mode\n"
+            "-hd          Enable high DPI, only supported by Apple platforms (OSX, iOS, and tvOS)\n"
             "-q           Enable quiet mode which does not log to standard output stream\n"
             "-b <length>  Sound buffer length in milliseconds\n"
             "-r <freq>    Sound mixing frequency in Hz\n"
@@ -100,7 +96,8 @@ void Urho3DPlayer::Setup()
             "-tq <level>  Texture quality level, default 2 (high)\n"
             "-tf <level>  Texture filter mode, default 2 (trilinear)\n"
             "-af <level>  Texture anisotropy level, default 4. Also sets anisotropic filter mode\n"
-            "-flushgpu    Flush GPU command queue each frame. Effective only on Direct3D9\n"
+            "-gl2         Force OpenGL 2 use even if OpenGL 3 is available\n"
+            "-flushgpu    Flush GPU command queue each frame. Effective only on Direct3D\n"
             "-borderless  Borderless window mode\n"
             "-headless    Headless mode. No application window will be created\n"
             "-landscape   Use landscape orientations (iOS only, default)\n"
@@ -114,7 +111,6 @@ void Urho3DPlayer::Setup()
             "-nothreads   Disable worker threads\n"
             "-nosound     Disable sound output\n"
             "-noip        Disable sound mixing interpolation\n"
-            "-sm2         Force SM2.0 rendering\n"
             "-touch       Touch emulation on desktop platform\n"
             #endif
         );
@@ -124,6 +120,12 @@ void Urho3DPlayer::Setup()
         // Use the script file name as the base name for the log file
         engineParameters_["LogName"] = filesystem->GetAppPreferencesDir("urho3d", "logs") + GetFileNameAndExtension(scriptFileName_) + ".log";
     }
+
+    // Construct a search path to find the resource prefix with two entries:
+    // The first entry is an empty path which will be substituted with program/bin directory -- this entry is for binary when it is still in build tree
+    // The second and third entries are possible relative paths from the installed program/bin directory to the asset directory -- these entries are for binary when it is in the Urho3D SDK installation location
+    if (!engineParameters_.Contains("ResourcePrefixPaths"))
+        engineParameters_["ResourcePrefixPaths"] = ";../share/Resources;../share/Urho3D/Resources";
 }
 
 void Urho3DPlayer::Start()
@@ -147,9 +149,9 @@ void Urho3DPlayer::Start()
         if (scriptFile_ && scriptFile_->Execute("void Start()"))
         {
             // Subscribe to script's reload event to allow live-reload of the application
-            SubscribeToEvent(scriptFile_, E_RELOADSTARTED, HANDLER(Urho3DPlayer, HandleScriptReloadStarted));
-            SubscribeToEvent(scriptFile_, E_RELOADFINISHED, HANDLER(Urho3DPlayer, HandleScriptReloadFinished));
-            SubscribeToEvent(scriptFile_, E_RELOADFAILED, HANDLER(Urho3DPlayer, HandleScriptReloadFailed));
+            SubscribeToEvent(scriptFile_, E_RELOADSTARTED, URHO3D_HANDLER(Urho3DPlayer, HandleScriptReloadStarted));
+            SubscribeToEvent(scriptFile_, E_RELOADFINISHED, URHO3D_HANDLER(Urho3DPlayer, HandleScriptReloadFinished));
+            SubscribeToEvent(scriptFile_, E_RELOADFAILED, URHO3D_HANDLER(Urho3DPlayer, HandleScriptReloadFailed));
             return;
         }
 #else
@@ -194,7 +196,7 @@ void Urho3DPlayer::Stop()
     {
     }
 #endif
-    
+
 #ifdef URHO3D_LUA
     else
     {

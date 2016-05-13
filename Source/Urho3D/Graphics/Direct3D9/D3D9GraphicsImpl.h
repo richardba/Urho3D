@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,26 +30,34 @@
 namespace Urho3D
 {
 
+#define URHO3D_SAFE_RELEASE(p) if (p) { ((IUnknown*)p)->Release();  p = 0; }
+
+#define URHO3D_LOGD3DERROR(msg, hr) URHO3D_LOGERRORF("%s (HRESULT %x)", msg, (unsigned)hr)
+
 /// %Graphics implementation. Holds API-specific objects.
 class URHO3D_API GraphicsImpl
 {
     friend class Graphics;
-    
+
 public:
     /// Construct.
     GraphicsImpl();
-    
+
     /// Return Direct3D device.
     IDirect3DDevice9* GetDevice() const { return device_; }
+
     /// Return device capabilities.
     const D3DCAPS9& GetDeviceCaps() const { return deviceCaps_; }
+
     /// Return window.
     SDL_Window* GetWindow() const { return window_; }
+
     /// Return adapter identifier.
     const D3DADAPTER_IDENTIFIER9& GetAdapterIdentifier() const { return adapterIdentifier_; }
+
     /// Return whether a texture format and usage is supported.
     bool CheckFormatSupport(D3DFORMAT format, DWORD usage, D3DRESOURCETYPE type);
-    
+
 private:
     /// SDL window.
     SDL_Window* window_;

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,9 +30,10 @@ namespace Urho3D
 class LuaFunction;
 class LuaScriptInstance;
 
+/// Lua script event invoker.
 class LuaScriptEventInvoker : public Object
 {
-    OBJECT(LuaScriptEventInvoker);
+    URHO3D_OBJECT(LuaScriptEventInvoker, Object);
 
 public:
     /// Construct.
@@ -48,7 +49,7 @@ public:
 private:
     /// Handle script event in Lua script.
     void HandleLuaScriptEvent(StringHash eventType, VariantMap& eventData);
-    
+
     /// Lua script instance.
     WeakPtr<LuaScriptInstance> instance_;
 };

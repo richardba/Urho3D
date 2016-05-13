@@ -19,6 +19,9 @@ function Start()
     -- Setup the viewport for displaying the scene
     SetupViewport()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE)
+
     -- Hook up to the frame update and render post-update events
     SubscribeToEvents()
 end
@@ -223,7 +226,7 @@ end
 
 function HandleUpdate(eventType, eventData)
     -- Take the frame time step, which is stored as a float
-    local timeStep = eventData:GetFloat("TimeStep")
+    local timeStep = eventData["TimeStep"]:GetFloat()
 
     -- Move the camera, scale movement with time step
     MoveCamera(timeStep)
@@ -246,7 +249,7 @@ end
 
 function CreateRagdoll:HandleNodeCollision(eventType, eventData)
     -- Get the other colliding body, make sure it is moving (has nonzero mass)
-    local otherBody = eventData:GetPtr("RigidBody", "OtherBody")
+    local otherBody = eventData["OtherBody"]:GetPtr("RigidBody")
 
     if otherBody.mass > 0.0 then
         -- We do not need the physics components in the AnimatedModel's root scene node anymore

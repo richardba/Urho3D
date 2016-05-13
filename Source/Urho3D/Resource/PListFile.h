@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -43,15 +43,13 @@ enum PListValueType
 
 class PListValue;
 
-class PListValueMap : public HashMap<String, PListValue>
-{
-public:
-    PListValue& operator [](const String& key); 
-    const PListValue& operator [](const String& key) const;
-};
+/// PList value map.
+typedef HashMap<String, PListValue> PListValueMap;
 
+/// Vector of PList value.
 typedef Vector<PListValue> PListValueVector;
 
+/// PList value.
 class URHO3D_API PListValue
 {
 public:
@@ -75,9 +73,10 @@ public:
     ~PListValue();
 
     /// Assign operator.
-    PListValue& operator = (const PListValue& rhs);
+    PListValue& operator =(const PListValue& rhs);
+
     /// Return true if is valid.
-    operator bool () const { return type_ != PLVT_NONE; }
+    operator bool() const { return type_ != PLVT_NONE; }
 
     /// Set int.
     void SetInt(int value);
@@ -88,12 +87,13 @@ public:
     /// Set string.
     void SetString(const String& value);
     /// Set value map.
-    void SetValueMap(const PListValueMap& valueMap);    
+    void SetValueMap(const PListValueMap& valueMap);
     /// Set value vector.
     void SetValueVector(const PListValueVector& valueVector);
 
     /// Return type.
     PListValueType GetType() const { return type_; }
+
     /// Return int.
     int GetInt() const;
     /// Return boolean.
@@ -137,7 +137,7 @@ private:
 /// Property list (plist).
 class URHO3D_API PListFile : public Resource
 {
-    OBJECT(PListFile);
+    URHO3D_OBJECT(PListFile, Resource);
 
 public:
     /// Construct.
@@ -159,7 +159,7 @@ private:
     /// Load array.
     bool LoadArray(PListValueVector& array, const XMLElement& arrayElem);
     /// Load value.
-    bool LoadValue(PListValue& value, XMLElement valueElem);
+    bool LoadValue(PListValue& value, const XMLElement& valueElem);
 
     /// Root dictionary.
     PListValueMap root_;

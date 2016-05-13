@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+#include "../Precompiled.h"
 
 #include "../Core/Context.h"
 #include "../IO/Deserializer.h"
@@ -45,12 +47,10 @@ LuaFile::LuaFile(Context* context) :
     hasLoaded_(false),
     hasExecuted_(false)
 {
-
 }
 
 LuaFile::~LuaFile()
 {
-
 }
 
 void LuaFile::RegisterObject(Context* context)
@@ -91,32 +91,24 @@ bool LuaFile::LoadChunk(lua_State* luaState)
     if (hasLoaded_)
         return true;
 
-    if (size_ == 0)
+    if (size_ == 0 || !luaState)
         return false;
-
-    if (!luaState)
-        return false;
-
-    int top = lua_gettop(luaState);
 
     // Get file base name
     String name = GetName();
     unsigned extPos = name.FindLast('.');
     if (extPos != String::NPOS)
-    {
         name = name.Substring(0, extPos);
-    }
 
-    int error = luaL_loadbuffer(luaState, data_, size_, name.CString());
-    if (error)
+    if (luaL_loadbuffer(luaState, data_, size_, name.CString()))
     {
         const char* message = lua_tostring(luaState, -1);
-        LOGERROR("Load Buffer failed for " + GetName() + ": " + String(message));
-        lua_settop(luaState, top);
+        URHO3D_LOGERRORF("Load Buffer failed for %s: %s", GetName().CString(), message);
+        lua_pop(luaState, 1);
         return false;
     }
 
-    LOGINFO("Loaded Lua script " + GetName());
+    URHO3D_LOGINFO("Loaded Lua script " + GetName());
     hasLoaded_ = true;
 
     return true;
@@ -130,16 +122,15 @@ bool LuaFile::LoadAndExecute(lua_State* luaState)
     if (!LoadChunk(luaState))
         return false;
 
-    int top = lua_gettop(luaState);
-
     if (lua_pcall(luaState, 0, 0, 0))
     {
         const char* message = lua_tostring(luaState, -1);
-        LOGERROR("Lua Execute failed for " + GetName() + ": " + String(message));
-        lua_settop(luaState, top);
+        URHO3D_LOGERRORF("Lua Execute failed for %s: %s", GetName().CString(), message);
+        lua_pop(luaState, 1);
         return false;
     }
 
+    URHO3D_LOGINFO("Executed Lua script " + GetName());
     hasExecuted_ = true;
 
     return true;

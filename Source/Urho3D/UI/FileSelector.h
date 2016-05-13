@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -50,7 +50,7 @@ struct FileSelectorEntry
 /// %File selector dialog.
 class URHO3D_API FileSelector : public Object
 {
-    OBJECT(FileSelector);
+    URHO3D_OBJECT(FileSelector, Object);
 
 public:
     /// Construct.
@@ -79,34 +79,47 @@ public:
 
     /// Return the UI style file.
     XMLFile* GetDefaultStyle() const;
+
     /// Return fileselector window.
     Window* GetWindow() const { return window_; }
+
     /// Return window title text element.
     Text* GetTitleText() const { return titleText_; }
+
     /// Return file list.
     ListView* GetFileList() const { return fileList_; }
+
     /// Return path editor.
     LineEdit* GetPathEdit() const { return pathEdit_; }
+
     /// Return filename editor.
     LineEdit* GetFileNameEdit() const { return fileNameEdit_; }
+
     /// Return filter dropdown.
     DropDownList* GetFilterList() const { return filterList_; }
+
     /// Return OK button.
     Button* GetOKButton() const { return okButton_; }
+
     /// Return cancel button.
     Button* GetCancelButton() const { return cancelButton_; }
+
     /// Return close button.
     Button* GetCloseButton() const { return closeButton_; }
+
     /// Return window title.
     const String& GetTitle() const;
+
     /// Return current path.
     const String& GetPath() const { return path_; }
+
     /// Return current filename.
     const String& GetFileName() const;
     /// Return current filter.
     const String& GetFilter() const;
     /// Return current filter index.
     unsigned GetFilterIndex() const;
+
     /// Return directory mode flag.
     bool GetDirectoryMode() const { return directoryMode_; }
 

@@ -22,6 +22,9 @@ void Start()
     // Setup the viewport for displaying the scene
     SetupViewport();
 
+    // Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE);
+
     // Hook up to the frame update and render post-update events
     SubscribeToEvents();
 }
@@ -85,6 +88,7 @@ void CreateScene()
         // Enable full blending weight and looping
         state.weight = 1.0f;
         state.looped = true;
+        state.time = Random(walkAnimation.length);
 
         // Create our Mover script object that will move & animate the model during each frame's update. Here we use a shortcut
         // script-only API function, CreateScriptObject, which creates a ScriptInstance component into the scene node, then uses

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,8 +20,10 @@
 // THE SOFTWARE.
 //
 
-#include "../IO/Log.h"
+#include "../Precompiled.h"
+
 #include "../Core/Profiler.h"
+#include "../IO/Log.h"
 #include "../Resource/Resource.h"
 
 namespace Urho3D
@@ -40,18 +42,19 @@ bool Resource::Load(Deserializer& source)
     // create a type name -based profile block here
 #ifdef URHO3D_PROFILING
     String profileBlockName("Load" + GetTypeName());
-    
+
     Profiler* profiler = GetSubsystem<Profiler>();
     if (profiler)
         profiler->BeginBlock(profileBlockName.CString());
 #endif
 
-    // Make sure any previous async state is cancelled
-    SetAsyncLoadState(ASYNC_DONE);
-
+    // If we are loading synchronously in a non-main thread, behave as if async loading (for example use
+    // GetTempResource() instead of GetResource() to load resource dependencies)
+    SetAsyncLoadState(Thread::IsMainThread() ? ASYNC_DONE : ASYNC_LOADING);
     bool success = BeginLoad(source);
     if (success)
         success &= EndLoad();
+    SetAsyncLoadState(ASYNC_DONE);
 
 #ifdef URHO3D_PROFILING
     if (profiler)
@@ -75,7 +78,7 @@ bool Resource::EndLoad()
 
 bool Resource::Save(Serializer& dest) const
 {
-    LOGERROR("Save not supported for " + GetTypeName());
+    URHO3D_LOGERROR("Save not supported for " + GetTypeName());
     return false;
 }
 

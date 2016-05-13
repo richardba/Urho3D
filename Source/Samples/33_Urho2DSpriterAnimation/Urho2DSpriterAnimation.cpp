@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,44 +20,30 @@
 // THE SOFTWARE.
 //
 
-#include <Urho3D/Urho3D.h>
-
-#include <Urho3D/Urho2D/AnimatedSprite2D.h>
-#include <Urho3D/Urho2D/AnimationSet2D.h>
-#include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Core/CoreEvents.h>
-#include <Urho3D/Urho2D/Drawable2D.h>
 #include <Urho3D/Engine/Engine.h>
-#include <Urho3D/UI/Font.h>
+#include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Graphics/Graphics.h>
-#include <Urho3D/Input/Input.h>
 #include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Graphics/Zone.h>
+#include <Urho3D/Input/Input.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
+#include <Urho3D/UI/Font.h>
 #include <Urho3D/UI/Text.h>
-#include <Urho3D/Graphics/Zone.h>
+#include <Urho3D/Urho2D/AnimatedSprite2D.h>
+#include <Urho3D/Urho2D/AnimationSet2D.h>
 
 #include "Urho2DSpriterAnimation.h"
 
 #include <Urho3D/DebugNew.h>
 
-static const char* animationNames[] =
-{
-    "idle",
-    "run",
-    "attack",
-    "hit",
-    "dead",
-    "dead2",
-    "dead3",
-};
-
-DEFINE_APPLICATION_MAIN(Urho2DSpriterAnimation)
+URHO3D_DEFINE_APPLICATION_MAIN(Urho2DSpriterAnimation)
 
 Urho2DSpriterAnimation::Urho2DSpriterAnimation(Context* context) :
     Sample(context),
-    animationIndex_(0)
+    spriterAnimationIndex_(0)
 {
 }
 
@@ -74,6 +60,9 @@ void Urho2DSpriterAnimation::Start()
 
     // Setup the viewport for displaying the scene
     SetupViewport();
+
+    // Set the mouse mode to use in the sample
+    Sample::InitMouseMode(MM_FREE);
 
     // Hook up to the frame update events
     SubscribeToEvents();
@@ -96,15 +85,15 @@ void Urho2DSpriterAnimation::CreateScene()
     camera->SetOrthoSize((float)graphics->GetHeight() * PIXEL_SIZE);
     camera->SetZoom(1.5f * Min((float)graphics->GetWidth() / 1280.0f, (float)graphics->GetHeight() / 800.0f)); // Set zoom according to user's resolution to ensure full visibility (initial zoom (1.5) is set for full visibility at 1280x800 resolution)
 
-    ResourceCache* cache = GetSubsystem<ResourceCache>();  
-    AnimationSet2D* animationSet = cache->GetResource<AnimationSet2D>("Urho2D/imp/imp.scml");
-    if (!animationSet)
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+    AnimationSet2D* spriterAnimationSet = cache->GetResource<AnimationSet2D>("Urho2D/imp/imp.scml");
+    if (!spriterAnimationSet)
         return;
 
-    spriteNode_ = scene_->CreateChild("SpriterAnimation");
-
-    AnimatedSprite2D* animatedSprite = spriteNode_->CreateComponent<AnimatedSprite2D>();
-    animatedSprite->SetAnimation(animationSet, animationNames[animationIndex_]);
+    spriterNode_ = scene_->CreateChild("SpriterAnimation");
+    AnimatedSprite2D* spriterAnimatedSprite = spriterNode_->CreateComponent<AnimatedSprite2D>();
+    spriterAnimatedSprite->SetAnimationSet(spriterAnimationSet);
+    spriterAnimatedSprite->SetAnimation(spriterAnimationSet->GetAnimation(spriterAnimationIndex_));
 }
 
 void Urho2DSpriterAnimation::CreateInstructions()
@@ -170,9 +159,8 @@ void Urho2DSpriterAnimation::MoveCamera(float timeStep)
 void Urho2DSpriterAnimation::SubscribeToEvents()
 {
     // Subscribe HandleUpdate() function for processing update events
-    SubscribeToEvent(E_UPDATE, HANDLER(Urho2DSpriterAnimation, HandleUpdate));
-    SubscribeToEvent(E_MOUSEBUTTONDOWN, HANDLER(Urho2DSpriterAnimation, HandleMouseButtonDown));
-
+    SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Urho2DSpriterAnimation, HandleUpdate));
+    SubscribeToEvent(E_MOUSEBUTTONDOWN, URHO3D_HANDLER(Urho2DSpriterAnimation, HandleMouseButtonDown));
 
     // Unsubscribe the SceneUpdate event from base class to prevent camera pitch and yaw in 2D sample
     UnsubscribeFromEvent(E_SCENEUPDATE);
@@ -191,7 +179,8 @@ void Urho2DSpriterAnimation::HandleUpdate(StringHash eventType, VariantMap& even
 
 void Urho2DSpriterAnimation::HandleMouseButtonDown(StringHash eventType, VariantMap& eventData)
 {
-    AnimatedSprite2D* animatedSprite = spriteNode_->GetComponent<AnimatedSprite2D>();
-    animationIndex_ = (animationIndex_ + 1) % 7;
-    animatedSprite->SetAnimation(animationNames[animationIndex_], LM_FORCE_LOOPED);
+    AnimatedSprite2D* spriterAnimatedSprite = spriterNode_->GetComponent<AnimatedSprite2D>();
+    AnimationSet2D* spriterAnimationSet = spriterAnimatedSprite->GetAnimationSet();
+    spriterAnimationIndex_ = (spriterAnimationIndex_ + 1) % spriterAnimationSet->GetNumAnimations();
+    spriterAnimatedSprite->SetAnimation(spriterAnimationSet->GetAnimation(spriterAnimationIndex_), LM_FORCE_LOOPED);
 }

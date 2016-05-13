@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -32,14 +32,14 @@ class URHO3D_API LuaScriptEventListener
 {
 public:
     /// Destruct.
-    virtual ~LuaScriptEventListener() {};
+    virtual ~LuaScriptEventListener() { };
 
-    /// Add a scripted event handler by function.
-    virtual void AddEventHandler(const String& eventName, int functionIndex) = 0;
+    /// Add a scripted event handler by function at the given stack index.
+    virtual void AddEventHandler(const String& eventName, int index) = 0;
     /// Add a scripted event handler by function name.
     virtual void AddEventHandler(const String& eventName, const String& functionName) = 0;
-    /// Add a scripted event handler by function for a specific sender.
-    virtual void AddEventHandler(Object* sender, const String& eventName, int functionIndex) = 0;
+    /// Add a scripted event handler by function at the given stack index for a specific sender.
+    virtual void AddEventHandler(Object* sender, const String& eventName, int index) = 0;
     /// Add a scripted event handler by function name for a specific sender.
     virtual void AddEventHandler(Object* sender, const String& eventName, const String& functionName) = 0;
     /// Remove a scripted event handler.
@@ -52,6 +52,10 @@ public:
     virtual void RemoveAllEventHandlers() = 0;
     /// Remove all scripted event handlers, except those listed.
     virtual void RemoveEventHandlersExcept(const Vector<String>& exceptionNames) = 0;
+    /// Return whether has subscribed to an event.
+    virtual bool HasEventHandler(const String& eventName) const = 0;
+    /// Return whether has subscribed to a specific sender's event.
+    virtual bool HasEventHandler(Object* sender, const String& eventName) const = 0;
 };
 
 }

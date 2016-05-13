@@ -66,6 +66,10 @@ void PS()
         vec4 normalInput = texture2DProj(sNormalBuffer, vScreenPos);
     #endif
 
+    // Position acquired via near/far ray is relative to camera. Bring position to world space
+    vec3 eyeVec = -worldPos;
+    worldPos += cCameraPosPS;
+    
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     vec4 projWorldPos = vec4(worldPos, 1.0);
     vec3 lightColor;
@@ -74,21 +78,21 @@ void PS()
     float diff = GetDiffuse(normal, worldPos, lightDir);
 
     #ifdef SHADOW
-        diff *= GetShadowDeferred(projWorldPos, depth);
+        diff *= GetShadowDeferred(projWorldPos, normal, depth);
     #endif
 
     #if defined(SPOTLIGHT)
-        vec4 spotPos = cLightMatricesPS[0] * projWorldPos;
+        vec4 spotPos = projWorldPos * cLightMatricesPS[0];
         lightColor = spotPos.w > 0.0 ? texture2DProj(sLightSpotMap, spotPos).rgb * cLightColor.rgb : vec3(0.0);
     #elif defined(CUBEMASK)
         mat3 lightVecRot = mat3(cLightMatricesPS[0][0].xyz, cLightMatricesPS[0][1].xyz, cLightMatricesPS[0][2].xyz);
-        lightColor = textureCube(sLightCubeMap, lightVecRot * (worldPos - cLightPosPS.xyz)).rgb * cLightColor.rgb;
+        lightColor = textureCube(sLightCubeMap, (worldPos - cLightPosPS.xyz) * lightVecRot).rgb * cLightColor.rgb;
     #else
         lightColor = cLightColor.rgb;
     #endif
 
     #ifdef SPECULAR
-        float spec = GetSpecular(normal, -worldPos, lightDir, normalInput.a * 255.0);
+        float spec = GetSpecular(normal, eyeVec, lightDir, normalInput.a * 255.0);
         gl_FragColor = diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0);
     #else
         gl_FragColor = diff * vec4(lightColor * albedoInput.rgb, 0.0);

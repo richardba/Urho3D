@@ -38,6 +38,9 @@ function Start()
     -- Setup the viewport for displaying the scene
     SetupViewport()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE)
+
     -- Hook up to necessary events
     SubscribeToEvents()
 end
@@ -222,8 +225,14 @@ function CreateControllableObject()
 end
 
 function MoveCamera()
+    input.mouseVisible = input.mouseMode ~= MM_RELATIVE
+    mouseDown = input:GetMouseButtonDown(MOUSEB_RIGHT)
+
+    -- Override the MM_RELATIVE mouse grabbed settings, to allow interaction with UI
+    input.mouseGrabbed = mouseDown
+
     -- Right mouse button controls mouse cursor visibility: hide when pressed
-    ui.cursor.visible = not input:GetMouseButtonDown(MOUSEB_RIGHT)
+    ui.cursor.visible = not mouseDown
 
     -- Mouse sensitivity as degrees per pixel
     local MOUSE_SENSITIVITY = 0.1
@@ -363,7 +372,7 @@ end
 
 function HandleClientConnected(eventType, eventData)
     -- When a client connects, assign to scene to begin scene replication
-    local newConnection = eventData:GetPtr("Connection", "Connection")
+    local newConnection = eventData["Connection"]:GetPtr("Connection")
     newConnection.scene = scene_
 
     -- Then create a controllable object for that client
@@ -381,7 +390,7 @@ end
 
 function HandleClientDisconnected(eventType, eventData)
     -- When a client disconnects, remove the controlled object
-    local connection = eventData:GetPtr("Connection", "Connection")
+    local connection = eventData["Connection"]:GetPtr("Connection")
     for i, v in ipairs(clients) do
         if v.connection == connection then
             v.object:Remove()
@@ -392,7 +401,7 @@ function HandleClientDisconnected(eventType, eventData)
 end
 
 function HandleClientObjectID(eventType, eventData)
-    clientObjectID = eventData:GetUInt("ID")
+    clientObjectID = eventData["ID"]:GetUInt()
 end
 
 -- Create XML patch instructions for screen joystick layout specific to this sample app

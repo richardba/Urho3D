@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,14 +20,19 @@
 // THE SOFTWARE.
 //
 
+#include "../Precompiled.h"
+
 #include "../Graphics/Graphics.h"
-#include "../IO/Log.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/RenderPath.h"
-#include "../Core/StringUtils.h"
+#include "../IO/Log.h"
 #include "../Resource/XMLFile.h"
 
 #include "../DebugNew.h"
+
+#ifdef _MSC_VER
+#pragma warning(disable:6293)
+#endif
 
 namespace Urho3D
 {
@@ -51,6 +56,8 @@ static const char* sortModeNames[] =
     0
 };
 
+extern const char* blendModeNames[];
+
 TextureUnit ParseTextureUnitName(String name);
 
 void RenderTargetInfo::Load(const XMLElement& element)
@@ -59,19 +66,21 @@ void RenderTargetInfo::Load(const XMLElement& element)
     tag_ = element.GetAttribute("tag");
     if (element.HasAttribute("enabled"))
         enabled_ = element.GetBool("enabled");
-    
+    if (element.HasAttribute("cubemap"))
+        cubemap_ = element.GetBool("cubemap");
+
     String formatName = element.GetAttribute("format");
     format_ = Graphics::GetFormat(formatName);
-    
+
     if (element.HasAttribute("filter"))
         filtered_ = element.GetBool("filter");
-    
+
     if (element.HasAttribute("srgb"))
         sRGB_ = element.GetBool("srgb");
-    
+
     if (element.HasAttribute("persistent"))
         persistent_ = element.GetBool("persistent");
-    
+
     if (element.HasAttribute("size"))
         size_ = element.GetVector2("size");
     if (element.HasAttribute("sizedivisor"))
@@ -82,7 +91,7 @@ void RenderTargetInfo::Load(const XMLElement& element)
     else if (element.HasAttribute("rtsizedivisor"))
     {
         // Deprecated rtsizedivisor mode, acts the same as sizedivisor mode now
-        LOGWARNING("Deprecated rtsizedivisor mode used in rendertarget definition");
+        URHO3D_LOGWARNING("Deprecated rtsizedivisor mode used in rendertarget definition");
         size_ = element.GetVector2("rtsizedivisor");
         sizeMode_ = SIZE_VIEWPORTDIVISOR;
     }
@@ -91,7 +100,7 @@ void RenderTargetInfo::Load(const XMLElement& element)
         size_ = element.GetVector2("sizemultiplier");
         sizeMode_ = SIZE_VIEWPORTMULTIPLIER;
     }
-    
+
     if (element.HasAttribute("width"))
         size_.x_ = element.GetFloat("width");
     if (element.HasAttribute("height"))
@@ -106,7 +115,7 @@ void RenderPathCommand::Load(const XMLElement& element)
         enabled_ = element.GetBool("enabled");
     if (element.HasAttribute("metadata"))
         metadata_ = element.GetAttribute("metadata");
-    
+
     switch (type_)
     {
     case CMD_CLEAR:
@@ -126,34 +135,41 @@ void RenderPathCommand::Load(const XMLElement& element)
         if (element.HasAttribute("stencil"))
         {
             clearFlags_ |= CLEAR_STENCIL;
-            clearStencil_ = element.GetInt("stencil");
+            clearStencil_ = (unsigned)element.GetInt("stencil");
         }
         break;
-        
+
     case CMD_SCENEPASS:
         pass_ = element.GetAttribute("pass");
-        sortMode_ = (RenderCommandSortMode)GetStringListIndex(element.GetAttributeLower("sort").CString(), sortModeNames, SORT_FRONTTOBACK);
+        sortMode_ =
+            (RenderCommandSortMode)GetStringListIndex(element.GetAttributeLower("sort").CString(), sortModeNames, SORT_FRONTTOBACK);
         if (element.HasAttribute("marktostencil"))
             markToStencil_ = element.GetBool("marktostencil");
         if (element.HasAttribute("vertexlights"))
             vertexLights_ = element.GetBool("vertexlights");
         break;
-        
+
     case CMD_FORWARDLIGHTS:
         pass_ = element.GetAttribute("pass");
         if (element.HasAttribute("uselitbase"))
             useLitBase_ = element.GetBool("uselitbase");
         break;
-        
+
     case CMD_LIGHTVOLUMES:
     case CMD_QUAD:
         vertexShaderName_ = element.GetAttribute("vs");
         pixelShaderName_ = element.GetAttribute("ps");
         vertexShaderDefines_ = element.GetAttribute("vsdefines");
         pixelShaderDefines_ = element.GetAttribute("psdefines");
-        
+
         if (type_ == CMD_QUAD)
         {
+            if (element.HasAttribute("blend"))
+            {
+                String blend = element.GetAttributeLower("blend");
+                blendMode_ = ((BlendMode)GetStringListIndex(blend.CString(), blendModeNames, BLEND_REPLACE));
+            }
+
             XMLElement parameterElem = element.GetChild("parameter");
             while (parameterElem)
             {
@@ -163,31 +179,35 @@ void RenderPathCommand::Load(const XMLElement& element)
             }
         }
         break;
-    
+
     default:
         break;
     }
-    
+
     // By default use 1 output, which is the viewport
-    outputNames_.Push("viewport");
+    outputs_.Resize(1);
+    outputs_[0] = MakePair(String("viewport"), FACE_POSITIVE_X);
     if (element.HasAttribute("output"))
-        outputNames_[0] = element.GetAttribute("output");
+        outputs_[0].first_ = element.GetAttribute("output");
+    if (element.HasAttribute("face"))
+        outputs_[0].second_ = (CubeMapFace)element.GetInt("face");
     if (element.HasAttribute("depthstencil"))
         depthStencilName_ = element.GetAttribute("depthstencil");
     // Check for defining multiple outputs
     XMLElement outputElem = element.GetChild("output");
     while (outputElem)
     {
-        unsigned index = outputElem.GetInt("index");
+        unsigned index = (unsigned)outputElem.GetInt("index");
         if (index < MAX_RENDERTARGETS)
         {
-            if (index >= outputNames_.Size())
-                outputNames_.Resize(index + 1);
-            outputNames_[index] = outputElem.GetAttribute("name");
+            if (index >= outputs_.Size())
+                outputs_.Resize(index + 1);
+            outputs_[index].first_ = outputElem.GetAttribute("name");
+            outputs_[index].second_ = outputElem.HasAttribute("face") ? (CubeMapFace)outputElem.GetInt("face") : FACE_POSITIVE_X;
         }
         outputElem = outputElem.GetNext("output");
     }
-    
+
     XMLElement textureElem = element.GetChild("texture");
     while (textureElem)
     {
@@ -199,7 +219,7 @@ void RenderPathCommand::Load(const XMLElement& element)
             String name = textureElem.GetAttribute("name");
             textureNames_[unit] = name;
         }
-        
+
         textureElem = textureElem.GetNext("texture");
     }
 }
@@ -222,17 +242,34 @@ void RenderPathCommand::RemoveShaderParameter(const String& name)
 
 void RenderPathCommand::SetNumOutputs(unsigned num)
 {
-    num = Clamp((int)num, 1, MAX_RENDERTARGETS);
-    outputNames_.Resize(num);
+    num = (unsigned)Clamp((int)num, 1, MAX_RENDERTARGETS);
+    outputs_.Resize(num);
+}
+
+void RenderPathCommand::SetOutput(unsigned index, const String& name, CubeMapFace face)
+{
+    if (index < outputs_.Size())
+        outputs_[index] = MakePair(name, face);
+    else if (index == outputs_.Size() && index < MAX_RENDERTARGETS)
+        outputs_.Push(MakePair(name, face));
 }
 
 void RenderPathCommand::SetOutputName(unsigned index, const String& name)
 {
-    if (index < outputNames_.Size())
-        outputNames_[index] = name;
-    else if (index == outputNames_.Size() && index < MAX_RENDERTARGETS)
-        outputNames_.Push(name);
+    if (index < outputs_.Size())
+        outputs_[index].first_ = name;
+    else if (index == outputs_.Size() && index < MAX_RENDERTARGETS)
+        outputs_.Push(MakePair(name, FACE_POSITIVE_X));
 }
+
+void RenderPathCommand::SetOutputFace(unsigned index, CubeMapFace face)
+{
+    if (index < outputs_.Size())
+        outputs_[index].second_ = face;
+    else if (index == outputs_.Size() && index < MAX_RENDERTARGETS)
+        outputs_.Push(MakePair(String::EMPTY, face));
+}
+
 
 void RenderPathCommand::SetDepthStencilName(const String& name)
 {
@@ -252,7 +289,12 @@ const Variant& RenderPathCommand::GetShaderParameter(const String& name) const
 
 const String& RenderPathCommand::GetOutputName(unsigned index) const
 {
-    return index < outputNames_.Size() ? outputNames_[index] : String::EMPTY;
+    return index < outputs_.Size() ? outputs_[index].first_ : String::EMPTY;
+}
+
+CubeMapFace RenderPathCommand::GetOutputFace(unsigned index) const
+{
+    return index < outputs_.Size() ? outputs_[index].second_ : FACE_POSITIVE_X;
 }
 
 RenderPath::RenderPath()
@@ -275,7 +317,7 @@ bool RenderPath::Load(XMLFile* file)
 {
     renderTargets_.Clear();
     commands_.Clear();
-    
+
     return Append(file);
 }
 
@@ -283,11 +325,11 @@ bool RenderPath::Append(XMLFile* file)
 {
     if (!file)
         return false;
-    
+
     XMLElement rootElem = file->GetRoot();
     if (!rootElem)
         return false;
-    
+
     XMLElement rtElem = rootElem.GetChild("rendertarget");
     while (rtElem)
     {
@@ -295,10 +337,10 @@ bool RenderPath::Append(XMLFile* file)
         info.Load(rtElem);
         if (!info.name_.Trimmed().Empty())
             renderTargets_.Push(info);
-        
+
         rtElem = rtElem.GetNext("rendertarget");
     }
-    
+
     XMLElement cmdElem = rootElem.GetChild("command");
     while (cmdElem)
     {
@@ -306,10 +348,10 @@ bool RenderPath::Append(XMLFile* file)
         cmd.Load(cmdElem);
         if (cmd.type_ != CMD_NONE)
             commands_.Push(cmd);
-        
+
         cmdElem = cmdElem.GetNext("command");
     }
-    
+
     return true;
 }
 
@@ -320,7 +362,7 @@ void RenderPath::SetEnabled(const String& tag, bool active)
         if (!renderTargets_[i].tag_.Compare(tag, false))
             renderTargets_[i].enabled_ = active;
     }
-    
+
     for (unsigned i = 0; i < commands_.Size(); ++i)
     {
         if (!commands_[i].tag_.Compare(tag, false))
@@ -335,7 +377,7 @@ void RenderPath::ToggleEnabled(const String& tag)
         if (!renderTargets_[i].tag_.Compare(tag, false))
             renderTargets_[i].enabled_ = !renderTargets_[i].enabled_;
     }
-    
+
     for (unsigned i = 0; i < commands_.Size(); ++i)
     {
         if (!commands_[i].tag_.Compare(tag, false))
@@ -417,7 +459,7 @@ void RenderPath::RemoveCommands(const String& tag)
 void RenderPath::SetShaderParameter(const String& name, const Variant& value)
 {
     StringHash nameHash(name);
-    
+
     for (unsigned i = 0; i < commands_.Size(); ++i)
     {
         HashMap<StringHash, Variant>::Iterator j = commands_[i].shaderParameters_.Find(nameHash);
@@ -429,14 +471,14 @@ void RenderPath::SetShaderParameter(const String& name, const Variant& value)
 const Variant& RenderPath::GetShaderParameter(const String& name) const
 {
     StringHash nameHash(name);
-    
+
     for (unsigned i = 0; i < commands_.Size(); ++i)
     {
         HashMap<StringHash, Variant>::ConstIterator j = commands_[i].shaderParameters_.Find(nameHash);
         if (j != commands_[i].shaderParameters_.End())
             return j->second_;
     }
-    
+
     return Variant::EMPTY;
 }
 

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,10 +22,10 @@
 
 #pragma once
 
-#include "../../Graphics/GPUObject.h"
 #include "../../Core/Object.h"
-#include "../../Graphics/GraphicsDefs.h"
 #include "../../Container/ArrayPtr.h"
+#include "../../Graphics/GPUObject.h"
+#include "../../Graphics/GraphicsDefs.h"
 
 namespace Urho3D
 {
@@ -33,21 +33,21 @@ namespace Urho3D
 /// Hardware index buffer.
 class URHO3D_API IndexBuffer : public Object, public GPUObject
 {
-    OBJECT(IndexBuffer);
-    
+    URHO3D_OBJECT(IndexBuffer, Object);
+
 public:
     /// Construct.
-    IndexBuffer(Context* context);
+    IndexBuffer(Context* context, bool forceHeadless = false);
     /// Destruct.
     virtual ~IndexBuffer();
-    
+
     /// Release default pool resources.
     virtual void OnDeviceLost();
     /// Recreate default pool resources.
     virtual void OnDeviceReset();
     /// Release buffer.
     virtual void Release();
-    
+
     /// Enable shadowing in CPU memory. Shadowing is forced on if the graphics subsystem does not exist.
     void SetShadowed(bool enable);
     /// Set size and vertex elements and dynamic mode. Previous data will be lost.
@@ -60,21 +60,28 @@ public:
     void* Lock(unsigned start, unsigned count, bool discard = false);
     /// Unlock the buffer and apply changes to the GPU buffer.
     void Unlock();
-    
+
     /// Return whether CPU memory shadowing is enabled.
     bool IsShadowed() const { return shadowed_; }
+
     /// Return whether is dynamic.
     bool IsDynamic() const;
+
     /// Return whether is currently locked.
     bool IsLocked() const { return lockState_ != LOCK_NONE; }
+
     /// Return number of indices.
-    unsigned GetIndexCount() const {return indexCount_; }
-    /// Return index size.
+    unsigned GetIndexCount() const { return indexCount_; }
+
+    /// Return index size in bytes.
     unsigned GetIndexSize() const { return indexSize_; }
+
     /// Return used vertex range from index range.
     bool GetUsedVertexRange(unsigned start, unsigned count, unsigned& minVertex, unsigned& vertexCount);
+
     /// Return CPU memory shadow data.
     unsigned char* GetShadowData() const { return shadowData_.Get(); }
+
     /// Return shared array pointer to the CPU memory shadow data.
     SharedArrayPtr<unsigned char> GetShadowDataShared() const { return shadowData_; }
 
@@ -87,7 +94,7 @@ private:
     void* MapBuffer(unsigned start, unsigned count, bool discard);
     /// Unmap the GPU buffer.
     void UnmapBuffer();
-    
+
     /// Shadow data.
     SharedArrayPtr<unsigned char> shadowData_;
     /// Number of indices.

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2015 the Urho3D project.
+// Copyright (c) 2008-2016 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +20,8 @@
 // THE SOFTWARE.
 //
 
+#include "../../Precompiled.h"
+
 #include "../../Graphics/Graphics.h"
 #include "../../Graphics/GraphicsImpl.h"
 
@@ -31,12 +33,18 @@ namespace Urho3D
 GraphicsImpl::GraphicsImpl() :
     window_(0),
     context_(0),
-    systemFbo_(0),
+    systemFBO_(0),
     activeTexture_(0),
-    enabledAttributes_(0),
-    boundFbo_(0),
+    enabledVertexAttributes_(0),
+    usedVertexAttributes_(0),
+    instancingVertexAttributes_(0),
+    vertexAttributes_(0),
+    boundFBO_(0),
+    boundVBO_(0),
+    boundUBO_(0),
     pixelFormat_(0),
-    fboDirty_(false)
+    fboDirty_(false),
+    vertexBuffersDirty_(false)
 {
 }
 

@@ -78,7 +78,7 @@ enum LockState
     LOCK_SCRATCH
 };
 
-enum VertexElement
+enum LegacyVertexElement
 {
     ELEMENT_POSITION = 0,
     ELEMENT_NORMAL,
@@ -93,7 +93,34 @@ enum VertexElement
     ELEMENT_INSTANCEMATRIX1,
     ELEMENT_INSTANCEMATRIX2,
     ELEMENT_INSTANCEMATRIX3,
-    MAX_VERTEX_ELEMENTS
+    ELEMENT_OBJECTINDEX,
+    MAX_LEGACY_VERTEX_ELEMENTS
+};
+
+enum VertexElementType
+{
+    TYPE_INT = 0,
+    TYPE_FLOAT,
+    TYPE_VECTOR2,
+    TYPE_VECTOR3,
+    TYPE_VECTOR4,
+    TYPE_UBYTE4,
+    TYPE_UBYTE4_NORM,
+    MAX_VERTEX_ELEMENT_TYPES
+};
+
+enum VertexElementSemantic
+{
+    SEM_POSITION = 0,
+    SEM_NORMAL,
+    SEM_BINORMAL,
+    SEM_TANGENT,
+    SEM_TEXCOORD,
+    SEM_COLOR,
+    SEM_BLENDWEIGHTS,
+    SEM_BLENDINDICES,
+    SEM_OBJECTINDEX,
+    MAX_VERTEX_ELEMENT_SEMANTICS
 };
 
 enum TextureFilterMode
@@ -155,19 +182,7 @@ enum ShaderType
     PS,
 };
 
-enum ShaderParameterGroup
-{
-    SP_FRAME = 0,
-    SP_CAMERA,
-    SP_VIEWPORT,
-    SP_ZONE,
-    SP_LIGHT,
-    SP_VERTEXLIGHTS,
-    SP_MATERIAL,
-    SP_OBJECTTRANSFORM,
-    MAX_SHADER_PARAMETER_GROUPS
-};
-
+// Texture unit numbering depends on graphics capability (mobile or desktop). Expose only the units we are sure of
 enum TextureUnit
 {
     TU_DIFFUSE = 0,
@@ -177,18 +192,6 @@ enum TextureUnit
     TU_SPECULAR = 2,
     TU_EMISSIVE = 3,
     TU_ENVIRONMENT = 4,
-    MAX_MATERIAL_TEXTURE_UNITS = 5,
-    TU_LIGHTRAMP = 5,
-    TU_LIGHTSHAPE = 6,
-    TU_SHADOWMAP = 7,
-    TU_FACESELECT = 8,
-    TU_INDIRECTION = 9,
-    TU_DEPTHBUFFER = 10,
-    TU_LIGHTBUFFER = 11,
-    TU_VOLUMEMAP = 12,
-    TU_ZONE = 13,
-    MAX_NAMED_TEXTURE_UNITS = 14,
-    MAX_TEXTURE_UNITS = 16
 };
 
 enum FaceCameraMode
@@ -197,19 +200,55 @@ enum FaceCameraMode
     FC_ROTATE_XYZ,
     FC_ROTATE_Y,
     FC_LOOKAT_XYZ,
-    FC_LOOKAT_Y
+    FC_LOOKAT_Y,
+    FC_DIRECTION
 };
+
+/// Shadow type
+enum ShadowQuality
+{
+    SHADOWQUALITY_SIMPLE_16BIT = 0,
+    SHADOWQUALITY_SIMPLE_24BIT,
+    SHADOWQUALITY_PCF_16BIT,
+    SHADOWQUALITY_PCF_24BIT,
+    SHADOWQUALITY_VSM,
+    SHADOWQUALITY_BLUR_VSM
+};
+
+struct VertexElement
+{
+    VertexElement();
+    VertexElement(VertexElementType type, VertexElementSemantic semantic, unsigned char index = 0, bool perInstance = false);
+
+    VertexElementType type_ @ type;
+    VertexElementSemantic semantic_ @ semantic;
+    unsigned char index_ @ index;
+    bool perInstance_ @ perInstance;
+    unsigned offset_ @ offset;
+};
+
 
 static const int QUALITY_LOW;
 static const int QUALITY_MEDIUM;
 static const int QUALITY_HIGH;
 static const int QUALITY_MAX;
 
-static const int SHADOWQUALITY_LOW_16BIT;
-static const int SHADOWQUALITY_LOW_24BIT;
-static const int SHADOWQUALITY_HIGH_16BIT;
-static const int SHADOWQUALITY_HIGH_24BIT;
-
 static const unsigned CLEAR_COLOR;
 static const unsigned CLEAR_DEPTH;
 static const unsigned CLEAR_STENCIL;
+
+static const unsigned MASK_NONE;
+static const unsigned MASK_POSITION;
+static const unsigned MASK_NORMAL;
+static const unsigned MASK_COLOR;
+static const unsigned MASK_TEXCOORD1;
+static const unsigned MASK_TEXCOORD2;
+static const unsigned MASK_CUBETEXCOORD1;
+static const unsigned MASK_CUBETEXCOORD2;
+static const unsigned MASK_TANGENT;
+static const unsigned MASK_BLENDWEIGHTS;
+static const unsigned MASK_BLENDINDICES;
+static const unsigned MASK_INSTANCEMATRIX1;
+static const unsigned MASK_INSTANCEMATRIX2;
+static const unsigned MASK_INSTANCEMATRIX3;
+static const unsigned MASK_OBJECTINDEX;

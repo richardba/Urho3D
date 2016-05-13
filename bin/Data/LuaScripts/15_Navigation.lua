@@ -25,6 +25,9 @@ function Start()
     -- Setup the viewport for displaying the scene
     SetupViewport()
 
+    -- Set the mouse mode to use in the sample
+    SampleInitMouseMode(MM_RELATIVE)
+
     -- Hook up to the frame update and render post-update events
     SubscribeToEvents()
 end
@@ -111,8 +114,10 @@ function CreateScene()
     local camera = cameraNode:CreateComponent("Camera")
     camera.farClip = 300.0
 
-    -- Set an initial position for the camera scene node above the plane
-    cameraNode.position = Vector3(0.0, 5.0, 0.0)
+    -- Set an initial position for the camera scene node above the plane and looking down
+    cameraNode.position = Vector3(0.0, 50.0, 0.0)
+    pitch = 80.0
+    cameraNode.rotation = Quaternion(pitch, yaw, 0.0)
 end
 
 function CreateUI()
@@ -129,7 +134,7 @@ function CreateUI()
     local instructionText = ui.root:CreateChild("Text")
     instructionText.text = "Use WASD keys to move, RMB to rotate view\n"..
         "LMB to set destination, SHIFT+LMB to teleport\n"..
-        "MMB to add or remove obstacles\n"..
+        "MMB or O key to add or remove obstacles\n"..
         "Space to toggle debug geometry"
     instructionText:SetFont(cache:GetResource("Font", "Fonts/Anonymous Pro.ttf"), 15)
     -- The text has multiple rows. Center them in relation to each other
@@ -157,8 +162,14 @@ function SubscribeToEvents()
 end
 
 function MoveCamera(timeStep)
+    input.mouseVisible = input.mouseMode ~= MM_RELATIVE
+    mouseDown = input:GetMouseButtonDown(MOUSEB_RIGHT)
+
+    -- Override the MM_RELATIVE mouse grabbed settings, to allow interaction with UI
+    input.mouseGrabbed = mouseDown
+
     -- Right mouse button controls mouse cursor visibility: hide when pressed
-    ui.cursor.visible = not input:GetMouseButtonDown(MOUSEB_RIGHT)
+    ui.cursor.visible = not mouseDown
 
     -- Do not move if the UI has a focused element (the console)
     if ui.focusElement ~= nil then
@@ -200,7 +211,7 @@ function MoveCamera(timeStep)
         SetPathPoint()
     end
     -- Add or remove objects with middle mouse button, then rebuild navigation mesh partially
-    if input:GetMouseButtonPress(MOUSEB_MIDDLE) then
+    if input:GetMouseButtonPress(MOUSEB_MIDDLE) or input:GetKeyPress(KEY_O) then
         AddOrRemoveObject()
     end
     -- Toggle debug geometry with space
@@ -210,9 +221,9 @@ function MoveCamera(timeStep)
 end
 
 function SetPathPoint()
-    local result, hitPos, hitDrawable = Raycast(250.0)
+    local hitPos, hitDrawable = Raycast(250.0)
     local navMesh = scene_:GetComponent("NavigationMesh")
-    if result then
+    if hitPos then
         local pathPos = navMesh:FindNearestPoint(hitPos, Vector3.ONE)
 
         if input:GetQualifierDown(QUAL_SHIFT) then
@@ -230,13 +241,13 @@ end
 
 function AddOrRemoveObject()
     -- Raycast and check if we hit a mushroom node. If yes, remove it, if no, create a new one
-    local result, hitPos, hitDrawable = Raycast(250.0)
-    if result then
+    local hitPos, hitDrawable = Raycast(250.0)
+    if hitDrawable then
         -- The part of the navigation mesh we must update, which is the world bounding box of the associated
         -- drawable component
         local updateBox = nil
 
-        local hitNode = hitDrawable:GetNode()
+        local hitNode = hitDrawable.node
         if hitNode.name == "Mushroom" then
             updateBox = hitDrawable.worldBoundingBox
             hitNode:Remove()
@@ -268,13 +279,11 @@ function CreateMushroom(pos)
 end
 
 function Raycast(maxDistance)
-    local hitPos = nil
-    local hitDrawable = nil
 
     local pos = ui.cursorPosition
     -- Check the cursor is visible and there is no UI element in front of the cursor
     if (not ui.cursor.visible) or (ui:GetElementAt(pos, true) ~= nil) then
-        return false, nil, nil
+        return nil, nil
     end
 
     local camera = cameraNode:GetComponent("Camera")
@@ -283,18 +292,15 @@ function Raycast(maxDistance)
     local octree = scene_:GetComponent("Octree")
     local result = octree:RaycastSingle(cameraRay, RAY_TRIANGLE, maxDistance, DRAWABLE_GEOMETRY)
     if result.drawable ~= nil then
-        -- Calculate hit position in world space
-        hitPos = cameraRay.origin + cameraRay.direction * result.distance
-        hitDrawable = result.drawable
-        return true, hitPos, hitDrawable
+        return result.position, result.drawable
     end
 
-    return false, nil, nil
+    return nil, nil
 end
 
 function HandleUpdate(eventType, eventData)
     -- Take the frame time step, which is stored as a float
-    local timeStep = eventData:GetFloat("TimeStep")
+    local timeStep = eventData["TimeStep"]:GetFloat()
 
     -- Move the camera, scale movement with time step
     MoveCamera(timeStep)
